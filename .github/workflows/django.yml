@@ -27,4 +27,5 @@ jobs:
         pip install -r webImage/requirements.txt
     - name: Run Tests
       run: |
+        cd webImage
         python manage.py test
