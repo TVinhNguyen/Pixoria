@@ -8,3 +8,4 @@ admin.site.register(Category)
 admin.site.register(Image)
 admin.site.register(Collection)
 admin.site.register(Subscription)
+#zzzzz
