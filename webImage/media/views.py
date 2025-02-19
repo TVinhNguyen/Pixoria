@@ -1,6 +1,10 @@
 from rest_framework import viewsets
-from .models import Category, Image, Collection, Subscription
-from .serializers import CategorySerializer, ImageSerializer, CollectionSerializer, SubscriptionSerializer
+from .models import Category, Image, Collection, User
+from .serializers import CategorySerializer, ImageSerializer, CollectionSerializer , UserSerializer
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -13,7 +17,3 @@ class ImageViewSet(viewsets.ModelViewSet):
 class CollectionViewSet(viewsets.ModelViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionSerializer
-
-class SubscriptionViewSet(viewsets.ModelViewSet):
-    queryset = Subscription.objects.all()
-    serializer_class = SubscriptionSerializer
