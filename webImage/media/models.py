@@ -1,78 +1,64 @@
-# filepath: /d:/vs/django/image/webImage1/webImage/media/models.py
+import os
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.files.storage import default_storage
-from PIL import Image as PILImage
-import os
-import mimetypes
 
-# User Model Extension (Assumes Custom User Model or Profile)
-class User(models.Model):
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
-    avatar = models.URLField(blank=True, null=True)  # URL to S3-hosted avatar
-    display_name = models.CharField(max_length=100)
+
+def user_directory_path(instance, filename):
+    """ Đường dẫn upload ảnh theo user: media/user_<id>/<filename> """
+    return f'user_{instance.user.id}/{filename}'
+
+
+class UserProfile(models.Model):
+    """ Hồ sơ người dùng, mở rộng từ Django User """
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    display_name = models.CharField(max_length=255, blank=True, null=True)
+    bio = models.TextField(blank=True, null=True)
+    avatar = models.ImageField(upload_to='avatars/', default='default/avatar.jpg')
     social_link = models.URLField(blank=True, null=True)
 
     def __str__(self):
-        return self.display_name or self.username
+        return self.display_name if self.display_name else self.user.username
 
-# Categories
+
 class Category(models.Model):
-    name = models.CharField(max_length=100, unique=True)
+    """ Danh mục ảnh """
+    name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(unique=True)
 
     def __str__(self):
         return self.name
 
-def user_directory_path(instance, filename):
-    # file will be uploaded to MEDIA_ROOT/user_<id>/<filename>
-    return f'user_{instance.user.id}/{filename}'
 
 class Image(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="images")
+    """ Model ảnh, chỉ chủ sở hữu mới có thể chỉnh sửa hoặc xóa """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Ảnh thuộc về 1 user
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
-    file_name = models.CharField(max_length=255)
-    file = models.ImageField(upload_to=user_directory_path, storage=default_storage, default='path/to/default/image.jpg')  # Use ImageField for image files
-    file_size = models.IntegerField()  # Size in bytes
-    resolution = models.CharField(max_length=50)  # Example: "1920x1080"
-    mime_type = models.CharField(max_length=50)
-    likes = models.IntegerField(default=0)
-    downloads = models.IntegerField(default=0)
-    is_public = models.BooleanField(default=True)  # Allows others to view/download
+    file = models.ImageField(upload_to=user_directory_path)
+    title = models.CharField(max_length=255, blank=True)
+    description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def save(self, *args, **kwargs):
-        # Set file_size
-        self.file_size = self.file.size
-
-        # Set mime_type
-        self.mime_type = mimetypes.guess_type(self.file.name)[0]
-
-        # Set resolution
-        image = PILImage.open(self.file)
-        self.resolution = f"{image.width}x{image.height}"
-
-        super().save(*args, **kwargs)
-
-    def can_edit(self, user):
-        return self.user == user
+    is_public = models.BooleanField(default=True)  # Công khai hay không
+    likes = models.PositiveIntegerField(default=0)
+    downloads = models.PositiveIntegerField(default=0)
 
     def __str__(self):
-        return self.file_name
+        return f"{self.user.username} - {self.title or 'Untitled'}"
 
-# Collections
+    class Meta:
+        ordering = ['-created_at']
+
+
 class Collection(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="collections")
+    """ Bộ sưu tập ảnh do người dùng tạo """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Collection thuộc về user
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    is_public = models.BooleanField(default=True)
-    images = models.ManyToManyField(Image, related_name="collections")
+    images = models.ManyToManyField(Image, related_name='collections', blank=True)
+    is_public = models.BooleanField(default=False)  # Mặc định là riêng tư
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def can_edit(self, user):
-        return self.user == user
-
     def __str__(self):
-        return self.name
+        return f"{self.name} ({'Public' if self.is_public else 'Private'})"
+
+    class Meta:
+        ordering = ['-created_at']
