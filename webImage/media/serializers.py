@@ -1,8 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Image, Category, Collection, UserProfile
+from .models import Image, Category, Collection, UserProfile, CollectionImage, ImageCategory, Notification
 
-# User Serializer
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -15,7 +14,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = '__all__'
 
-# User Registration Serializer
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
 
@@ -32,13 +30,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         UserProfile.objects.create(user=user)
         return user
 
-# Category Serializer
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = '__all__'
 
-# Image Serializer
 class ImageSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
 
@@ -48,15 +44,29 @@ class ImageSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         if 'file' in data:
-            if data['file'].size > 5 * 1024 * 1024:  # Giới hạn 5MB
+            if data['file'].size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("Ảnh không được lớn hơn 5MB!")
         return data
 
-# Collection Serializer
 class CollectionSerializer(serializers.ModelSerializer):
     user = serializers.ReadOnlyField(source='user.username')
     images = ImageSerializer(many=True, read_only=True)
 
     class Meta:
         model = Collection
+        fields = '__all__'
+
+class CollectionImagesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CollectionImage
+        fields = '__all__'
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
+
+class ImagesCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImageCategory
         fields = '__all__'

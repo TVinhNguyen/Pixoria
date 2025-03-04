@@ -1,6 +1,6 @@
 import PropTypes from "prop-types";
 import Masonry from "react-masonry-css";
-import ImageCard from "../ImageCard/ImageCard";
+import ImageCard from "../SearchBar/ImageCard";
 
 const MasonryGrid = ({ images }) => {
   const breakpointColumns = {

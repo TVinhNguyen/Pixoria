@@ -72,7 +72,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'pexels_db',
         'USER': 'postgres',
-        'PASSWORD': '1234',
+        'PASSWORD': '123',
         'HOST': 'localhost',
         'PORT': 5432,
     }
@@ -103,6 +103,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',  # Thêm dòng này để hiển thị nút Login
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.TokenAuthentication'
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',

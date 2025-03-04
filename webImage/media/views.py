@@ -5,12 +5,12 @@ from rest_framework.views import APIView
 from rest_framework.generics import CreateAPIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import action
-
 from django.contrib.auth.models import User
-from .models import Category, Image, Collection
+from .models import Category, Image, Collection, UserProfile, CollectionImage, ImageCategory
 from .serializers import (
     CategorySerializer, ImageSerializer, CollectionSerializer, 
-    UserSerializer, RegisterSerializer , UserProfileSerializer
+    UserSerializer, RegisterSerializer, UserProfileSerializer, 
+    CollectionImagesSerializer, ImagesCategorySerializer
 )
 
 # Đăng ký người dùng
@@ -42,7 +42,6 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
-
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
@@ -98,3 +97,15 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if instance.user != request.user:
             return Response({"error": "Bạn không có quyền xóa bộ sưu tập này"}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
+
+# API quản lý hình ảnh trong bộ sưu tập
+class CollectionImagesViewSet(viewsets.ModelViewSet):
+    queryset = CollectionImage.objects.all()
+    serializer_class = CollectionImagesSerializer
+    permission_classes = [IsAuthenticated]
+
+# API quản lý danh mục của hình ảnh
+class ImagesCategoryViewSet(viewsets.ModelViewSet):
+    queryset = ImageCategory.objects.all()
+    serializer_class = ImagesCategorySerializer
+    permission_classes = [IsAuthenticated]
