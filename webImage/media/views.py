@@ -68,6 +68,9 @@ class ImageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return Image.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)  # Gán user khi tạo ảnh
 
     @action(detail=False, permission_classes=[AllowAny])
     def public_images(self, request):
