@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import HomePage from "../pages/Home/HomePage";
 import LoginPage from "../pages/Auth/LoginPage";
 import PrivateRoute from "./PrivateRoute";
-import MainLayout from "../components/layouts/MainLayout/MainLayout";
+import MainLayout from "../components/layouts/MainLayout";
 import ProfilePage from "../pages/Profile/ProfilePage"; // Thêm dòng này
 
 const AppRouter = () => {

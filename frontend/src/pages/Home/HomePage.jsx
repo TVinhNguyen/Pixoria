@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import SearchBar from "../../components/common/SearchBar/SearchBar";
-import MasonryGrid from "../../components/common/MasonryGrid/MasonryGrid";
+import MasonryGrid from "../../components/common/SearchBar/MasonryGrid";
 import { getImages } from "../../services/imageService";
 
 const HomePage = () => {

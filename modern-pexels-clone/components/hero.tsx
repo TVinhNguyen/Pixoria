@@ -33,7 +33,8 @@ export default function Hero() {
             onChange={(e) => setQuery(e.target.value)}
             className="w-full pl-12 pr-4 py-3 rounded-full text-lg shadow-lg focus:ring-2 focus:ring-purple-500"
           />
-          <Button type="submit" size="icon" className="absolute left-2 top-1/2 transform -translate-y-1/2">
+          <Button type="submit" size="icon" className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-transparent text-gray-500 dark:text-white 
+             hover:bg-gray-500/10 dark:hover:bg-white/10 transition">
             <Search className="h-5 w-5" />
           </Button>
         </form>

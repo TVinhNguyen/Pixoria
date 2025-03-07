@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import endpoints from "../config/endpoints"; // Import endpoints.js
+import endpoints from "/src/api/endpoints"; // Import endpoints.js
 
 const ProfilePage = () => {
   const [userProfile, setUserProfile] = useState(null);
