@@ -19,24 +19,6 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-# Đăng nhập và lấy JWT Token
-class LoginView(APIView):
-    permission_classes = [AllowAny]
-
-    def post(self, request):
-        username = request.data.get("username")
-        password = request.data.get("password")
-        print(username, password)
-
-        user = User.objects.filter(username=username).first()
-        if user and user.check_password(password):
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-                "user": UserSerializer(user).data
-            })
-        return Response({"error": "Sai tài khoản hoặc mật khẩu"}, status=status.HTTP_401_UNAUTHORIZED)
 
 # Người dùng API
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
@@ -66,10 +48,18 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # Hình ảnh API (Chỉ chủ sở hữu có thể sửa/xóa)
 class ImageViewSet(viewsets.ModelViewSet):
     serializer_class = ImageSerializer
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.action in ["public_images", "list"]:  
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get_queryset(self):
-        return Image.objects.filter(user=self.request.user)
+        if self.request.user.is_authenticated:
+            public = self.request.query_params.get("public", None)
+            if public and public.lower() == "true":
+                return Image.objects.filter(is_public=True)
+            return Image.objects.filter(user=self.request.user)
+        return Image.objects.filter(is_public=True) 
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)  # Gán user khi tạo ảnh

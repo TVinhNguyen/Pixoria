@@ -1,8 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenObtainPairView
+
 from .views import (
     CategoryViewSet, ImageViewSet, CollectionViewSet, UserViewSet,
-    RegisterView, LoginView, UserProfileViewSet, 
+    RegisterView, UserProfileViewSet, 
     CollectionImagesViewSet, ImagesCategoryViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -19,10 +21,12 @@ router.register(r'images-categories', ImagesCategoryViewSet, basename='images-ca
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/register/', RegisterView.as_view(), name='register'),
-    path('auth/login/', LoginView.as_view(), name='login'),
+    path('api/login/', TokenObtainPairView.as_view(), name='login'),
     
     # Thêm dòng này để hiển thị nút Login trên giao diện DRF
     path('api-auth/', include('rest_framework.urls')),
+
+    
 
     # được dùng để hỗ trợ trong việc xác thực, lấy sự liên hệ từ frontend qua backend
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
