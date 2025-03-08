@@ -26,6 +26,7 @@ class LoginView(APIView):
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
+        print(username, password)
 
         user = User.objects.filter(username=username).first()
         if user and user.check_password(password):
@@ -48,7 +49,8 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return UserProfile.objects.filter(user=self.request.user)
+        print("User:", self.request.user)  # Debug xem user có đúng không
+        return UserProfile.objects.filter(user=self.request.user).order_by("id")
 
     def perform_update(self, serializer):
         if self.request.user != serializer.instance.user:

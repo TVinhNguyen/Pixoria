@@ -6,6 +6,8 @@ import { Moon, Sun, Upload, Bell, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/hooks/use-theme"
 
+import ProfileModal from "./modal/profile-modal"
+
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const {theme, toggleTheme} = useTheme()
@@ -18,6 +20,36 @@ export default function Header() {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [profileData, setProfileData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMzYwNTIzLCJpYXQiOjE3NDEyNzQxMjMsImp0aSI6IjkwZWJiYzQzNjFiZTRiMDFhZTkyYjk3OWJhZjM3MjBmIiwidXNlcl9pZCI6Mn0.Uk5SFujobPMhbUztkaajZrKsqQzVWqpV1WJ9G5ES-Lo"
+
+  const handleOpenProfile = async () => {
+    setIsProfileOpen(true)
+    if (!profileData) {
+        setLoading(true)
+        try {
+            const result = await fetch("http://127.0.0.1:8000/profile/2/", {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+            })
+            console.log(result)
+            if (!result.ok) throw new Error("Failed to fetch profile data!")
+            const data = await result.json()
+            setProfileData(data)
+        } catch (error) {
+            console.error("Error fetching profile:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+  }
 
   return (
     <header
@@ -51,7 +83,7 @@ export default function Header() {
           <Button variant="ghost" size="icon">
             <Bell className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" onClick={handleOpenProfile}>
             <User className="h-5 w-5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
@@ -62,13 +94,16 @@ export default function Header() {
             )}
             <span className="sr-only">Toggle theme</span>
           </Button>
-          {/* <Button variant="ghost" size="icon">
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-          </Button> */}
         </nav>
       </div>
+      
+      {isProfileOpen && (
+        <ProfileModal 
+          data={profileData} 
+          loading={false} 
+          onClose={() => setIsProfileOpen(false)} 
+        />
+      )}
     </header>
   )
 }
