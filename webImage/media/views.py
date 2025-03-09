@@ -1,4 +1,6 @@
 from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.views import APIView
@@ -19,12 +21,20 @@ class RegisterView(CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-
 # Người dùng API
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
+
+    @action(detail=False, methods=['get'], url_path='get-user')
+    def get_user_by_username(self, request):
+        username = request.query_params.get('username')
+        if not username:
+            return Response({'error': 'Username is required'}, status=400)
+        user = get_object_or_404(User, username=username)
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
 
 class UserProfileViewSet(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
