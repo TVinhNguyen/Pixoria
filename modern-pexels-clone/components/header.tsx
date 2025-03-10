@@ -31,9 +31,9 @@ export default function Header() {
   
   const fetchProfileData = async () => {
     try {
-      const userId = localStorage.getItem("user_id");
-      if (userId) {
-        const data = await getProfile(userId);
+      const username = localStorage.getItem("username");
+      if (username) {
+        const data = await getProfile(username);
         setProfileUser(data);
       }
     } catch (error) {

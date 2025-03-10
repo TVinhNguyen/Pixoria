@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .views import (
     CategoryViewSet, ImageViewSet, CollectionViewSet, UserViewSet,
     RegisterView, UserProfileViewSet, 
-    CollectionImagesViewSet, ImagesCategoryViewSet
+    CollectionImagesViewSet, ImagesCategoryViewSet, NotificationViewSet
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -17,6 +17,7 @@ router.register(r'collections', CollectionViewSet, basename='collection')
 router.register(r'profile', UserProfileViewSet, basename='userprofile')
 router.register(r'collection-images', CollectionImagesViewSet, basename='collection-images')
 router.register(r'images-categories', ImagesCategoryViewSet, basename='images-categories')
+router.register(r'notifications', NotificationViewSet, basename='notification')
 
 urlpatterns = [
     path('', include(router.urls)),

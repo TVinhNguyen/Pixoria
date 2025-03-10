@@ -39,8 +39,8 @@ const LoginModal: FC<LoginModalProps> = ({ isOpen, onClose, onLogin }) => {
             localStorage.setItem("token", data_token.access);
             localStorage.setItem("user", JSON.stringify(data_user));
             localStorage.setItem("user_id", data_user.id);
+            localStorage.setItem("username", username);
             console.log(data_token);
-            console.log(data_user);
             onClose();
             setTimeout(() => {
                 window.location.reload();
