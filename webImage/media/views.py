@@ -133,3 +133,36 @@ class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=['get'], url_path='get-notification')
+    def get_notification_by_userId(self, request):
+        userId = request.query_params.get('userid')
+        if not userId:
+            return Response({'error': 'User ID is required'}, status=400)
+        user = get_object_or_404(User, id=userId)
+        notifications = Notification.objects.filter(user=user).order_by('-sent_day')
+        serializer = self.get_serializer(notifications, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'], url_path='mark-all-as-read')
+    def mark_all_as_read(self, request):
+        userId = request.query_params.get('userid')
+        if not userId:
+            return Response({'error': 'UserID is required!'}, status=400)
+        user = get_object_or_404(User, id=userId)
+        notifications = Notification.objects.filter(user=user, is_read=False)
+        notifications.update(is_read=True)
+        serializer = self.get_serializer(notifications, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['delete'], url_path='delete-all')
+    def delete_all_notifications(self, request):
+        userId = request.query_params.get('userid')
+        if not userId:
+            return Response({'error': 'UserID is required!'}, status=400)
+        user = get_object_or_404(User, id=userId)
+        notifications = Notification.objects.filter(user=user)
+        if not notifications.exists():
+            return Response({'error': 'No notifications to delete!'}, status=200)
+        notifications.delete()
+        return Response(status=status.HTTP_200_OK)
