@@ -5,7 +5,17 @@ from .models import Image, Category, Collection, UserProfile, CollectionImage, I
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
+        fields = ['id', 'username', 'email', 'password']
+        extra_kwargs = {
+            'password': {'write_only': True},  
+        }
+
+    def update(self, instance, validated_data):
+        """Xử lý cập nhật User (bao gồm đổi mật khẩu nếu có)"""
+        password = validated_data.pop('password', None)
+        if password:
+            instance.set_password(password) 
+        return super().update(instance, validated_data)
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
