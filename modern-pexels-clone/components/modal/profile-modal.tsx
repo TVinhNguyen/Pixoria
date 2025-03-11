@@ -73,7 +73,8 @@ const ProfileModal: FC<ProfileModalProps> = ({ isOpen, onClose, data }) => {
             if (selectedFile) {
                 dataToSave.append("avatar", selectedFile);
             }
-            const response = await fetch(`http://127.0.0.1:8000/profile/${profile.user.id}/`, {
+            const profile_id = localStorage.getItem("profile_id");
+            const response = await fetch(`http://127.0.0.1:8000/profile/${profile_id}/`, {
                 method: "PUT",
                 headers: {
                     "Authorization": `Bearer ${localStorage.getItem("token")}`,
@@ -200,10 +201,10 @@ const ProfileModal: FC<ProfileModalProps> = ({ isOpen, onClose, data }) => {
 
 export default ProfileModal;
 
-export const getProfile = async (userId: string) => {
+export const getProfile = async (username: string) => {
     try {
         console.log(localStorage.getItem("token"))
-        const response = await fetch(`http://127.0.0.1:8000/profile/${userId}`, {
+        const response = await fetch(`http://127.0.0.1:8000/profile/get-profile/?username=${username}`, {
             method: "GET",
             headers: {
               "Content-Type": "application/json",
@@ -211,7 +212,9 @@ export const getProfile = async (userId: string) => {
             },
         });
         if (!response.ok) throw new Error("Error fetching profile data!");
-        return await response.json();
+        const data = await response.json();
+        localStorage.setItem("profile_id", data.id);
+        return data;
     } catch (error) {
         console.error(error);
         return null;

@@ -8,11 +8,11 @@ from rest_framework.generics import CreateAPIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.decorators import action
 from django.contrib.auth.models import User
-from .models import Category, Image, Collection, UserProfile, CollectionImage, ImageCategory
+from .models import Category, Image, Collection, UserProfile, CollectionImage, ImageCategory, Notification
 from .serializers import (
     CategorySerializer, ImageSerializer, CollectionSerializer, 
     UserSerializer, RegisterSerializer, UserProfileSerializer, 
-    CollectionImagesSerializer, ImagesCategorySerializer
+    CollectionImagesSerializer, ImagesCategorySerializer, NotificationSerializer
 )
 
 # Đăng ký người dùng
@@ -48,6 +48,19 @@ class UserProfileViewSet(viewsets.ModelViewSet):
         if self.request.user != serializer.instance.user:
             return Response({"error": "Bạn không có quyền chỉnh sửa hồ sơ này"}, status=403)
         serializer.save()
+    
+    @action(detail=False, methods=['get'], url_path='get-profile')
+    def get_profile_by_username(self, request):
+        username = request.query_params.get('username')
+        if not username:
+            return Response({'error': 'Username is required'}, status=status.HTTP_400_BAD_REQUEST)
+        user = get_object_or_404(User, username=username)
+        user_profiles = UserProfile.objects.filter(user=user)
+        if not user_profiles.exists():
+            return Response({'error': 'UserProfile not found'}, status=status.HTTP_404_NOT_FOUND)
+        user_profile = user_profiles.first()
+        serializer = self.get_serializer(user_profile)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 # Danh mục API
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -113,4 +126,10 @@ class CollectionImagesViewSet(viewsets.ModelViewSet):
 class ImagesCategoryViewSet(viewsets.ModelViewSet):
     queryset = ImageCategory.objects.all()
     serializer_class = ImagesCategorySerializer
+    permission_classes = [IsAuthenticated]
+
+# API quản lí các notification
+class NotificationViewSet(viewsets.ModelViewSet):
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
