@@ -8,6 +8,7 @@ import { useTheme } from "@/hooks/use-theme"
 
 import ProfileModal, { getProfile } from "./modal/profile-modal"
 import LoginModal from "./modal/login-modal"
+import NotificationModal from "./modal/notification-modal"
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -15,6 +16,7 @@ export default function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [profileUser, setProfileUser] = useState(null)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,6 +52,10 @@ export default function Header() {
     }
   };
 
+  const handleNotification = async () => {
+    setIsNotificationModalOpen(true);
+  }
+
   return (
     <>
       <header
@@ -80,7 +86,7 @@ export default function Header() {
             <Button variant="ghost" size="icon">
               <Upload className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={handleNotification}>
               <Bell className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" onClick={handleClickUser}>
@@ -100,6 +106,7 @@ export default function Header() {
 
       <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onLogin={(user, pass) => console.log(user, pass)} />
       {isProfileModalOpen && <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} data={profileUser} />}
+      {isNotificationModalOpen && <NotificationModal isOpen={isNotificationModalOpen} onClose={() => setIsNotificationModalOpen(false)} />}
     </>
   )
 }
