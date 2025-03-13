@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
@@ -15,17 +15,36 @@ from .serializers import (
     CollectionImagesSerializer, ImagesCategorySerializer, NotificationSerializer
 )
 
-# Đăng ký người dùng
 class RegisterView(CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
 
-# Người dùng API
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = User.objects.all()
+
+class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
-    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:  
+            return User.objects.all()
+        return User.objects.filter(id=self.request.user.id)  
+
+    def get_permissions(self):
+        if self.action in ['create', 'get_user_by_username']: 
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]  
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        user.set_password(user.password)
+        user.save()
+
+    def perform_update(self, serializer):
+        user = serializer.instance
+        password = serializer.validated_data.get("password", None)
+        if password:
+            user.set_password(password)
+        serializer.save()
 
     @action(detail=False, methods=['get'], url_path='get-user')
     def get_user_by_username(self, request):
@@ -36,6 +55,11 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = self.get_serializer(user)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def me(self, request):
+        """API để user lấy thông tin cá nhân"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 class UserProfileViewSet(viewsets.ModelViewSet):
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated]
