@@ -13,8 +13,9 @@ import NotificationModal from "./modal/notification-modal"
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const {theme, toggleTheme} = useTheme()
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+
   const [profileUser, setProfileUser] = useState(null)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
 

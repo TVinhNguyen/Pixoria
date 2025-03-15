@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Link from "next/link"
 
 import { handleLoginClick } from "@/lib/api-action/api-login"
+import { handleSignupClick } from "@/lib/api-action/api-signup"
 import ErrorModal from "./error-modal"
 
 interface LoginModalProps {
@@ -24,7 +25,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [email, setEmail] = useState("")
-  const [fullName, setFullName] = useState("")
+  const [username_signup, setUserName_signup] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
@@ -44,11 +45,16 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     }
   }
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle signup logic here
-    console.log("Signup:", { fullName, email, password, confirmPassword })
-    onClose()
+    const user = await handleSignupClick(username_signup, password, email)
+    if (user != null) {
+      setNotificationMessage("Signup successful! Please login to continue.")
+      setIsNotificationOpen(true)
+    } else {
+      setNotificationMessage("Signup failed! Make sure your password is 5-letter long or more than.")
+      setIsNotificationOpen(true)
+    }
   }
 
   if (!isOpen) return null
@@ -172,12 +178,12 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
           <TabsContent value="signup">
             <form onSubmit={handleSignup} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="username_signup">Username</Label>
                 <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Enter your full name"
+                  id="username_signup"
+                  value={username_signup}
+                  onChange={(e) => setUserName_signup(e.target.value)}
+                  placeholder="Enter your username"
                   required
                 />
               </div>
@@ -273,7 +279,7 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         </Tabs>
 
         <ErrorModal
-          title="Login Error"
+          title="Notification"
           message={notificationMessage}
           isOpen={isNotificationOpen}
           onClose={() => setIsNotificationOpen(false)}
@@ -282,4 +288,3 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
     </div>
   )
 }
-
