@@ -3,6 +3,9 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 import mimetypes
+import dj_database_url
+
+load_dotenv()
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,17 +84,7 @@ WSGI_APPLICATION = 'webImage.wsgi.application'
 # Database (PostgreSQL)
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'neondb',
-        'USER': 'neondb_owner',
-        'PASSWORD': 'npg_6QngZMp7ivRV',
-        'HOST': 'ep-little-morning-a7w9qhdt-pooler.ap-southeast-2.aws.neon.tech',
-        'PORT': '5432',
-        'OPTIONS': {
-            'sslmode': 'require',
-        }
-    }
+    'default': dj_database_url.config(conn_max_age=600, ssl_require=True)
 }
 
 # Password validation
@@ -138,7 +131,6 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-load_dotenv()
 mimetypes.add_type("image/jpeg", ".mpo", strict=True)
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

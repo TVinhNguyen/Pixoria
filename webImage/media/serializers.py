@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Image, Category, Collection, UserProfile, CollectionImage, ImageCategory, Notification
+from .models import Image, Category, Collection, UserProfile, ImageCategory, Notification
+from django.utils.timesince import timesince
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -57,24 +58,39 @@ class ImageSerializer(serializers.ModelSerializer):
             if data['file'].size > 5 * 1024 * 1024:
                 raise serializers.ValidationError("Ảnh không được lớn hơn 5MB!")
         return data
-
 class CollectionSerializer(serializers.ModelSerializer):
-    user = serializers.ReadOnlyField(source='user.username')
-    images = ImageSerializer(many=True, read_only=True)
+    user = serializers.CharField(source='user.user.username', read_only=True)  
+    images = serializers.PrimaryKeyRelatedField(
+        queryset=Image.objects.all(), many=True, required=False
+    )  # Cho phép danh sách ID của images, không bắt buộc
 
     class Meta:
         model = Collection
-        fields = '__all__'
+        fields = ['id', 'user', 'name', 'description', 'images', 'is_public', 'created_at']
+        read_only_fields = ['id', 'user', 'created_at']
+    
+    def validate_images(self, value):
+        """Chặn người dùng thêm ảnh không phải của họ vào bộ sưu tập riêng tư"""
+        user_profile = self.context['request'].user.userprofile
+        for image in value:
+            if not image.is_public and image.user != user_profile:
+                raise serializers.ValidationError("Bạn không thể thêm ảnh riêng tư của người khác vào bộ sưu tập.")
+        return value
 
-class CollectionImagesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CollectionImage
-        fields = '__all__'
 
 class NotificationSerializer(serializers.ModelSerializer):
+    user = serializers.CharField(source='user.username', read_only=True)
+    userAvatar = serializers.CharField(source='user.profile.avatar.url', read_only=True)
+    userAvatar = serializers.SerializerMethodField()
+    time = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
-        fields = '__all__'
+        fields = ['id', 'type', 'user', 'userAvatar', 'content', 'time', 'is_read']
+
+    def get_time(self, obj):
+        return timesince(obj.sent_day) + " ago"  
+
 
 class ImagesCategorySerializer(serializers.ModelSerializer):
     class Meta:
