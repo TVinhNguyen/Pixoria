@@ -79,16 +79,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'webImage.wsgi.application'
 
 # Database (PostgreSQL)
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'pexels_db',
-#         'USER': 'postgres',
-#         'PASSWORD': '1234',
-#         'HOST': 'localhost',
-#         'PORT': 5432,
-#     }
-# }
 
 DATABASES = {
     'default': {
