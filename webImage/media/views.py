@@ -1,18 +1,22 @@
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from django.contrib.auth.models import User
+from rest_framework import viewsets, status, permissions, mixins
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import CreateAPIView
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.db.models import Q
-from django.contrib.auth.models import User
-from .models import Category, Image, UserProfile, ImageCategory, Notification , Collection
+
+from .models import Category, Image, UserProfile, ImageCategory, Notification, Collection
 from .serializers import (
     CategorySerializer, ImageSerializer, CollectionSerializer,
     UserSerializer, RegisterSerializer, UserProfileSerializer, 
     ImagesCategorySerializer, NotificationSerializer
 )
+# Import hàm tiện ích để tạo thông báo
+from .utils import create_notification
+
+# Các ViewSet khác giữ nguyên...
 
 class RegisterView(CreateAPIView):
     queryset = User.objects.all()
@@ -124,11 +128,11 @@ class ImageViewSet(viewsets.ModelViewSet):
             public = self.request.query_params.get("public", None)
             if public and public.lower() == "true":
                 return Image.objects.filter(is_public=True)
-            return Image.objects.filter(user=self.request.user)
+            return Image.objects.filter(user=self.request.user.userprofile)
         return Image.objects.filter(is_public=True) 
     
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save(user=self.request.user.userprofile)
 
     @action(detail=False, permission_classes=[AllowAny])
     def public_images(self, request):
@@ -136,20 +140,120 @@ class ImageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+    # Thêm action cho like ảnh và tạo thông báo
+    @action(detail=True, methods=['post'], url_path='like')
+    def like_image(self, request, pk=None):
+        """API endpoint để like ảnh và tạo thông báo"""
+        image = self.get_object()
+        # Xử lý logic like ở đây (thêm vào model Like nếu có)
+        image.likes += 1
+        image.save()
+        
+        # Tạo thông báo cho chủ sở hữu ảnh
+        if image.user != request.user.userprofile:
+            create_notification(
+                sender_profile=request.user.userprofile,
+                recipient_profile=image.user,
+                notification_type='like',
+                content=f"liked your photo '{image.title or 'Untitled'}'"
+            )
+        
+        return Response({"status": "success", "likes": image.likes})
+    
+    # Thêm action cho comment ảnh và tạo thông báo
+    @action(detail=True, methods=['post'], url_path='comment')
+    def comment_image(self, request, pk=None):
+        """API endpoint để comment ảnh và tạo thông báo"""
+        image = self.get_object()
+        content = request.data.get('content')
+        
+        if not content:
+            return Response({
+                "error": "Comment content is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Xử lý logic comment ở đây (thêm vào model Comment nếu có)
+        # comment = Comment.objects.create(...)
+        
+        # Tạo thông báo cho chủ sở hữu ảnh
+        if image.user != request.user.userprofile:
+            create_notification(
+                sender_profile=request.user.userprofile,
+                recipient_profile=image.user,
+                notification_type='comment',
+                content=f"commented on your photo: '{content[:30]}...'" if len(content) > 30 else f"commented on your photo: '{content}'"
+            )
+        
+        return Response({"status": "success", "message": "Comment posted successfully"})
+
 class ImagesCategoryViewSet(viewsets.ModelViewSet):
     queryset = ImageCategory.objects.all()
     serializer_class = ImagesCategorySerializer
     permission_classes = [IsAuthenticated]
 
-class NotificationViewSet(viewsets.ModelViewSet):
+class NotificationViewSet(mixins.ListModelMixin,
+                          mixins.RetrieveModelMixin,
+                          mixins.UpdateModelMixin,
+                          viewsets.GenericViewSet):
+    """
+    ViewSet cho Notification.
+    Chỉ cho phép list, retrieve và update (để đánh dấu đã đọc)
+    """
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user.userprofile)  # Lấy thông báo của user hiện tại
+        return Notification.objects.filter(recipient=self.request.user.userprofile)
 
     @action(detail=False, methods=['get'], url_path='get-notifications')
     def get_notifications(self, request):
-        notifications = self.get_queryset()
+        """Lấy tất cả thông báo của người dùng hiện tại"""
+        notifications = self.get_queryset().order_by('-sent_at')
+        
+        # Thêm tùy chọn giới hạn số lượng thông báo
+        limit = request.query_params.get('limit')
+        if limit and limit.isdigit():
+            notifications = notifications[:int(limit)]
+            
+        # Thêm tùy chọn chỉ lấy thông báo chưa đọc
+        unread_only = request.query_params.get('unread')
+        if unread_only and unread_only.lower() == 'true':
+            notifications = notifications.filter(is_read=False)
+        
         serializer = self.get_serializer(notifications, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['patch'], url_path='mark-as-read')
+    def mark_as_read(self, request, pk=None):
+        """API endpoint để đánh dấu một thông báo là đã đọc"""
+        notification = self.get_object()
+        notification.is_read = True
+        notification.save()
+        serializer = self.get_serializer(notification)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['patch'], url_path='mark-all-as-read')
+    def mark_all_as_read(self, request):
+        """API endpoint để đánh dấu tất cả thông báo là đã đọc"""
+        notifications = self.get_queryset()
+        notifications.update(is_read=True)
+        return Response({"status": "success", "message": "All notifications marked as read"})
+    
+    @action(detail=False, methods=['get'], url_path='count')
+    def get_notification_count(self, request):
+        """API endpoint để lấy số lượng thông báo chưa đọc"""
+        unread_count = self.get_queryset().filter(is_read=False).count()
+        return Response({"unread_count": unread_count})
+    
+    # Vô hiệu hóa các phương thức tạo và xoá thông báo qua API
+    def create(self, request, *args, **kwargs):
+        return Response(
+            {"error": "Creating notifications directly is not allowed"},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+    
+    def destroy(self, request, *args, **kwargs):
+        return Response(
+            {"error": "Deleting notifications is not allowed"},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )

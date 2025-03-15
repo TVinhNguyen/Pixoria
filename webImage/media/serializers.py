@@ -79,18 +79,26 @@ class CollectionSerializer(serializers.ModelSerializer):
 
 
 class NotificationSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(source='user.username', read_only=True)
-    userAvatar = serializers.CharField(source='user.profile.avatar.url', read_only=True)
+
+    user = serializers.CharField(source='sender.user.username', read_only=True)
     userAvatar = serializers.SerializerMethodField()
     time = serializers.SerializerMethodField()
-
+    read = serializers.BooleanField(source='is_read', read_only=True)
+    
     class Meta:
         model = Notification
-        fields = ['id', 'type', 'user', 'userAvatar', 'content', 'time', 'is_read']
+        fields = ['id', 'type', 'user', 'userAvatar', 'content', 'time', 'read']
+        read_only_fields = ['id', 'type', 'user', 'userAvatar', 'content', 'time']
+
+    def get_userAvatar(self, obj):
+        """Trả về URL avatar của người gửi thông báo"""
+        if obj.sender and hasattr(obj.sender, 'avatar') and obj.sender.avatar:
+            return obj.sender.avatar.url
+        return None  # hoặc URL ảnh mặc định
 
     def get_time(self, obj):
-        return timesince(obj.sent_day) + " ago"  
-
+        """Trả về thời gian dạng tương đối (ví dụ: '5 minutes ago')"""
+        return timesince(obj.sent_at) + " ago"
 
 class ImagesCategorySerializer(serializers.ModelSerializer):
     class Meta:
