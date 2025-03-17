@@ -153,14 +153,7 @@ export default function ImageGrid({ paginationType, imagesPerPage }: ImageGridPr
     <section className="py-12 px-4">
       <div className="container mx-auto">
         {/* Debug info */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="mb-4 p-2 bg-gray-100 rounded">
-            <p>Loaded images: {images?.length || 0}</p>
-            <p>Displayed images: {displayedImages?.length || 0}</p>
-            <p>Current page: {currentPage}/{totalPages}</p>
-            <p>Loading: {isLoading ? "Yes" : "No"}</p>
-          </div>
-        )}
+       
 
         {/* Loading skeleton for traditional pagination or initial load */}
         {isLoading && paginationType === "traditional" && (
