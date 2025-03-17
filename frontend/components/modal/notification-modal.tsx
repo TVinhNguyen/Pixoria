@@ -5,6 +5,7 @@ import { X, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
+import { handleNotificationClick, handleMarkedAllAsReadClick, handleMarkAsRead } from "@/lib/api-action/api-notification"
 
 interface NotificationData {
   id: number;
@@ -37,20 +38,8 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   const fetchNotifications = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://127.0.0.1:8000/notifications/get-notifications/`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      
-      if (!response.ok) throw new Error("Error fetching notifications!");
-      
-      const data = await response.json();
+      const data = await handleNotificationClick();
       setNotifications(data);
-    } catch (error) {
-      console.error("Failed to fetch notifications:", error);
     } finally {
       setIsLoading(false);
     }
@@ -59,17 +48,7 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   // Mark all notifications as read
   const handleMarkedAllAsRead = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/notifications/mark-all-as-read/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      
-      if (!response.ok) throw new Error("Failed to mark notifications as read");
-      
-      // Refresh notifications
+      await handleMarkedAllAsReadClick();
       fetchNotifications();
     } catch (error) {
       console.error("Error marking notifications as read:", error);
@@ -79,17 +58,7 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   // Mark a single notification as read
   const markAsRead = async (id: number) => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/notifications/${id}/mark-as-read/`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      
-      if (!response.ok) throw new Error("Failed to mark notification as read");
-      
-      // Refresh notifications
+      await handleMarkAsRead(id);
       fetchNotifications();
     } catch (error) {
       console.error(`Error marking notification ${id} as read:`, error);
