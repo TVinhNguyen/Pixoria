@@ -5,27 +5,35 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon } from "lucide-react"
-import { getProfile } from "@/components/modal/profile-modal"
+import { handleProfileClick } from "@/lib/api-action/api-profile"
+import ProfileEditModal from "@/components/modal/edit-profile-modal"
 
 export default function Profile() {
   const [profileData, setProfileData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+
+  const fetchProfile = async () => {
+    try {
+      const username = localStorage.getItem("username") || "guest"
+      const data = await handleProfileClick(username)
+      setProfileData(data)
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const username = localStorage.getItem("username") || "guest"
-        const data = await getProfile(username)
-        setProfileData(data)
-      } catch (error) {
-        console.error("Error fetching profile:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchProfile()
   }, [])
+
+  useEffect(() => {
+    if (!isEditModalOpen) {
+      fetchProfile()
+    }
+  }, [isEditModalOpen])
 
   if (loading) {
     return (
@@ -47,7 +55,10 @@ export default function Profile() {
               height={128}
               className="h-full w-full object-cover"
             />
-            <button className="absolute bottom-0 right-0 bg-primary rounded-full p-1.5 shadow-md">
+            <button
+              className="absolute bottom-0 right-0 bg-primary rounded-full p-1.5 shadow-md"
+              onClick={() => setIsEditModalOpen(true)}
+            >
               <Edit className="h-4 w-4 text-white" />
             </button>
           </div>
@@ -56,21 +67,28 @@ export default function Profile() {
 
       <div className="container mx-auto px-4 pt-20 pb-8">
         <div className="flex flex-col items-center justify-center space-y-2 mb-8">
-          <h1 className="text-3xl font-bold">{profileData?.fullName || "User"}</h1>
+          <h1 className="text-3xl font-bold">{profileData?.display_name || "User"}</h1>
           <p className="text-muted-foreground">@{profileData?.username || "username"}</p>
 
           <p className="text-center max-w-md mt-2">{profileData?.bio || "No bio yet"}</p>
 
           <div className="flex items-center gap-2 mt-2">
-            <Button variant="outline" size="sm">
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Website
-            </Button>
+            {profileData?.social_link && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={profileData.social_link} target="_blank" rel="noopener noreferrer">
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Website
+                </a>
+              </Button>
+            )}
             <Button variant="outline" size="sm">
               <Share2 className="h-4 w-4 mr-2" />
               Share
             </Button>
-            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+            <Button
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+              onClick={() => setIsEditModalOpen(true)}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit Profile
             </Button>
@@ -221,6 +239,23 @@ export default function Profile() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {profileData && (
+        <ProfileEditModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          profile={{
+            username: profileData.username || "",
+            display_name: profileData.display_name || "",
+            avatar: profileData.avatar || "",
+            bio: profileData.bio || "",
+            followers: profileData.followers || 0,
+            following: profileData.following || 0,
+            photos: profileData.photos || 0,
+            social_link: profileData.social_link || "",
+          }}
+        />
+      )}
     </div>
   )
 }
