@@ -73,6 +73,7 @@ class ImageCategory(models.Model):
 
     class Meta:
         unique_together = ('image', 'category')
+        ordering = ['id']
 
 
 class Collection(models.Model):
