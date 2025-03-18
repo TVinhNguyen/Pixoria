@@ -6,15 +6,19 @@ import { Moon, Sun, Upload, Bell, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/hooks/use-theme"
 
-import ProfileModal, { getProfile } from "./modal/profile-modal"
+import ProfileModal from "./modal/profile-modal"
 import LoginModal from "./modal/login-modal"
 import NotificationModal from "./modal/notification-modal"
+
+import { ProfileData } from "./modal/profile-modal"
+import { handleProfileClick } from "@/lib/api-action/api-profile"
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const {theme, toggleTheme} = useTheme()
+
+  const [profileUser, setProfileUser] = useState<ProfileData | null>(null)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-  const [profileUser, setProfileUser] = useState(null)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
 
@@ -35,7 +39,7 @@ export default function Header() {
     try {
       const username = localStorage.getItem("username");
       if (username) {
-        const data = await getProfile(username);
+        const data = await handleProfileClick(username);
         setProfileUser(data);
       }
     } catch (error) {
@@ -43,6 +47,11 @@ export default function Header() {
     }
   };
   
+  const handleUpload = () => {
+    window.location.href = "/upload";
+  };
+  
+
   const handleClickUser = async () => {
     if (!profileUser) {
       setIsLoginModalOpen(true);
@@ -83,7 +92,7 @@ export default function Header() {
             >
               License
             </Link>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={handleUpload}>
               <Upload className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" onClick={handleNotification}>
