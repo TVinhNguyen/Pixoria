@@ -198,20 +198,20 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 
 
-class ImageSearchView(APIView):
-    """API view để tìm kiếm ảnh tương tự"""
+class ImageSearchViewSet(viewsets.ViewSet):
+    """ViewSet để tìm kiếm ảnh tương tự"""
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
-    def get(self, request):
-        """Hiển thị form tìm kiếm"""
+    def list(self, request):
+        """Hiển thị form tìm kiếm (tương đương với GET request trong APIView)"""
         return Response({
             'message': 'Tìm kiếm ảnh tương tự',
-            'instructions': 'Sử dụng form bên dưới để upload ảnh hoặc cung cấp URL ảnh'
+            'instructions': 'Sử dụng POST request để upload ảnh hoặc cung cấp URL ảnh'
         })
     
-    def post(self, request):
-        """Xử lý tìm kiếm ảnh"""
+    def create(self, request):
+        """Xử lý tìm kiếm ảnh (tương đương với POST request trong APIView)"""
         # Kiểm tra dữ liệu đầu vào
         image_file = request.FILES.get('image_file')
         image_url = request.data.get('image_url')
@@ -339,7 +339,34 @@ class ImageSearchView(APIView):
                 'error': f'Lỗi khi tìm kiếm ảnh tương tự: {str(e)}',
                 'traceback': error_traceback
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    @action(detail=False, methods=['post'], url_path='upload')
+    def search_by_upload(self, request):
+        """Endpoint tìm kiếm bằng file ảnh tải lên"""
+        self.permission_classes = [AllowAny]
 
+        image_file = request.FILES.get('image_file')
+        if not image_file:
+            return Response({
+                "error": "Vui lòng cung cấp file ảnh"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Sử dụng phương thức create để xử lý
+        return self.create(request)
+    
+    @action(detail=False, methods=['post'], url_path='url')
+    def search_by_url(self, request):
+        """Endpoint tìm kiếm bằng URL ảnh"""
+        self.permission_classes = [AllowAny]
+
+        image_url = request.data.get('image_url')
+        if not image_url:
+            return Response({
+                "error": "Vui lòng cung cấp URL ảnh"
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Sử dụng phương thức create để xử lý
+        return self.create(request)
 class ImagesCategoryViewSet(viewsets.ModelViewSet):
     queryset = ImageCategory.objects.select_related('image', 'category', 'image__user').order_by('id')
     serializer_class = ImagesCategorySerializer
