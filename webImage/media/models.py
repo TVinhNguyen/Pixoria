@@ -7,7 +7,7 @@ from django.utils.timesince import timesince
 
 def user_directory_path(instance, filename):
     """ Đường dẫn upload ảnh theo user: media/user_<id>/<filename> """
-    return f'user_{instance.user.id}/{filename}'
+    return f'image/{filename}'
 
 
 class UserProfile(models.Model):
@@ -73,6 +73,7 @@ class ImageCategory(models.Model):
 
     class Meta:
         unique_together = ('image', 'category')
+        ordering = ['id']
 
 
 class Collection(models.Model):

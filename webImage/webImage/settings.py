@@ -32,18 +32,19 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'storages',
-
+    'corsheaders',
     # Local apps
     'media',
-
+    'imageretrieval'
     # For request to server (pip install django-cors-headers)
-    'corsheaders'
+    
+
 ]
 
 # Middleware
 MIDDLEWARE = [
     # The first is to allow to fetch data
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -56,6 +57,17 @@ MIDDLEWARE = [
 # Allow frontend to fetch data from backend
 CORS_ALLOW_ALL_ORIGINS = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # URL configuration
