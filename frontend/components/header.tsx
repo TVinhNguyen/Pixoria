@@ -47,6 +47,11 @@ export default function Header() {
     }
   };
   
+  const handleUpload = () => {
+    window.location.href = "/upload";
+  };
+  
+
   const handleClickUser = async () => {
     if (!profileUser) {
       setIsLoginModalOpen(true);
@@ -87,7 +92,7 @@ export default function Header() {
             >
               License
             </Link>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" onClick={handleUpload}>
               <Upload className="h-5 w-5" />
             </Button>
             <Button variant="ghost" size="icon" onClick={handleNotification}>
