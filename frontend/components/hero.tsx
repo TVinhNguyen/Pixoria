@@ -5,11 +5,12 @@ import { useState, useRef, useCallback } from "react"
 import { Search, Upload, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
+import { Download, Heart, Share2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Masonry from "react-masonry-css"
 import { searchByImage, searchByText, searchByImageUrl, VisualSearchResult } from "@/lib/api-action/visual-search"
-import ImageGrid from "@/components/image-grid" // Import ImageGrid component
 
-// Định nghĩa kiểu dữ liệu cho kết quả tìm kiếm - phù hợp với kiểu ImageData trong ImageGrid
-// Đảm bảo rằng kiểu này khớp với định nghĩa trong image-grid.tsx
+// Định nghĩa kiểu dữ liệu cho kết quả tìm kiếm
 interface ImageData {
   id: number
   src: string
@@ -18,7 +19,6 @@ interface ImageData {
   height: number
   title?: string
   description?: string
-  created_at?: string
   likes?: number
   downloads?: number
 }
@@ -29,7 +29,7 @@ export default function Hero() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
-  const [searchResults, setSearchResults] = useState<ImageData[]>([])
+  const [searchResults, setSearchResults] = useState<ImageData[]>([]) 
   const [hasSearched, setHasSearched] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
@@ -53,36 +53,20 @@ export default function Hero() {
       }
       
       // Chuyển đổi và đảm bảo id luôn là number
-      const formattedResults: ImageData[] = results.map(result => {
-        let numId: number;
-        
-        if (typeof result.id === 'string') {
-          // Chuyển đổi string sang number, nếu không thành công thì dùng số ngẫu nhiên
-          const parsed = parseInt(result.id, 10);
-          numId = !isNaN(parsed) ? parsed : Math.floor(Math.random() * 100000);
-        } else if (typeof result.id === 'number') {
-          // Nếu đã là number rồi thì giữ nguyên
-          numId = result.id;
-        } else {
-          // Trường hợp không có id
-          numId = Math.floor(Math.random() * 100000);
-        }
-        
-        return {
-          id: numId,
-          src: result.url || result.src || "",
-          alt: result.title || "Search result",
-          width: result.width || 500,
-          height: result.height || 500,
-          title: result.title || "",
-          description: result.description || "",
-          likes: result.likes || 0,
-          downloads: 0
-        };
-      });
+      const formattedResults = results.map(result => ({
+        id: typeof result.id === 'string' ? parseInt(result.id, 10) || Math.floor(Math.random() * 100000) : (result.id || Math.floor(Math.random() * 100000)),
+        src: result.url || result.src || "",
+        alt: result.title || "Search result",
+        width: result.width || 500,
+        height: result.height || 500,
+        title: result.title || "",
+        description: result.description || "",
+        likes: result.likes || 0,
+        downloads: 0
+      }));
       
-      console.log("Formatted results for ImageGrid:", formattedResults);
-      setSearchResults(formattedResults);
+      console.log("Formatted results:", formattedResults);
+      setSearchResults(formattedResults)
     } catch (error) {
       console.error("Search error:", error)
       setSearchResults([])
@@ -91,6 +75,8 @@ export default function Hero() {
     }
   }
   
+  // Các hàm xử lý file và kéo thả - giữ nguyên
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -107,18 +93,30 @@ export default function Hero() {
     setQuery("")
   }
 
+  
   const handleUploadClick = () => {
     // Trigger the hidden file input
     fileInputRef.current?.click()
   }
 
   const clearUploadedImage = () => {
-    setUploadedImage(null)
-    setUploadedFile(null)
+    // Xóa ảnh đã upload
+    setUploadedImage(null);
+    setUploadedFile(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""
+      fileInputRef.current.value = "";
     }
-  }
+    
+    // Xóa kết quả tìm kiếm khi xóa ảnh đã upload
+    if (searchResults.length > 0) {
+      setSearchResults([]);
+      // Tùy chọn: thông báo đã xóa kết quả tìm kiếm
+      console.log("Đã xóa kết quả tìm kiếm liên quan");
+      
+      // Nếu bạn muốn giữ lại flag hasSearched là true, hãy comment dòng dưới đây
+      setHasSearched(false); 
+    }
+  };
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -155,14 +153,6 @@ export default function Hero() {
       }
     }
   }, [])
-
-  // Reset search state when clicking on the logo or navigating home
-  const resetSearch = () => {
-    setSearchResults([]);
-    setHasSearched(false);
-    setQuery("");
-    clearUploadedImage();
-  }
 
   return (
     <>
@@ -262,7 +252,7 @@ export default function Hero() {
         </div>
       </section>
 
-      {/* Hiển thị kết quả tìm kiếm */}
+      {/* Hiển thị kết quả tìm kiếm - trực tiếp trong Hero thay vì dùng ImageGrid */}
       {hasSearched && (
         <div className="bg-gray-50 dark:bg-gray-900">
           <div className="container mx-auto py-8">
@@ -281,13 +271,62 @@ export default function Hero() {
               </div>
             )}
             
-            {/* Truyền searchResults vào ImageGrid */}
+            {/* Hiển thị kết quả tìm kiếm sử dụng Masonry trực tiếp */}
             {!isSearching && searchResults.length > 0 && (
-              <ImageGrid 
-                paginationType="traditional" 
-                imagesPerPage={20}
-                searchResults={searchResults}
-              />
+              <Masonry
+                breakpointCols={{
+                  default: 4,
+                  1100: 3,
+                  700: 2,
+                  500: 1,
+                }}
+                className="flex w-auto px-4"
+                columnClassName="bg-clip-padding px-2"
+              >
+                {searchResults.map((image, index) => (
+                  <div
+                    key={`${image.id}-${index}`}
+                    className="mb-4 group relative overflow-hidden"
+                  >
+                    <div className="aspect-auto rounded-lg overflow-hidden">
+                      <Image
+                        src={image.src}
+                        width={500}
+                        height={500}
+                        alt={image.alt || image.title || "Image"}
+                        className="rounded-lg shadow-md transition-shadow duration-300 w-full h-auto object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          console.error("Image loading failed:", image.src);
+                          // Fallback to placeholder on error
+                          (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        }}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center overflow-hidden">
+                      <div className="flex space-x-2">
+                        <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                          <Download className="h-5 w-5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                          <Heart className="h-5 w-5" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                          <Share2 className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Optional: Show image details */}
+                    {image.title && (
+                      <div className="mt-2">
+                        <h3 className="text-sm font-medium">{image.title}</h3>
+                        {image.description && <p className="text-xs text-gray-500">{image.description}</p>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </Masonry>
             )}
             
             {/* Hiển thị thông báo khi không tìm thấy kết quả */}
