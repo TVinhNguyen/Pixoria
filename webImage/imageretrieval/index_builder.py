@@ -201,7 +201,7 @@ class IndexBuilder:
             mapping_path (str): Đường dẫn lưu mapping.
         """
         if self.use_gpu and faiss.get_num_gpus() > 0:
-            faiss.write_index(faiss.index_gpu_to_cpu(self.index), index_path)
+            faiss.write_index(faiss.index_gpu_to_cpu(self.index), str(index_path))
         else:
             faiss.write_index(self.index, index_path)
 
@@ -219,7 +219,7 @@ class IndexBuilder:
             index_path (str): Đường dẫn file FAISS index.
             mapping_path (str): Đường dẫn file mapping.
         """
-        self.index = faiss.read_index(index_path)
+        self.index = faiss.read_index(str(index_path))
 
         if self.use_gpu and faiss.get_num_gpus() > 0:
             res = faiss.StandardGpuResources()

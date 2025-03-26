@@ -8,6 +8,7 @@ import dj_database_url
 load_dotenv()
 
 # Base directory
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key (Không dùng key này trong production!)
@@ -119,19 +120,6 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Django REST Framework settings
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': (
-#         'rest_framework.authentication.SessionAuthentication',  # Thêm dòng này để hiển thị nút Login
-#         'rest_framework_simplejwt.authentication.JWTAuthentication',
-#         'rest_framework.authentication.TokenAuthentication'
-#     ),
-#     'DEFAULT_PERMISSION_CLASSES': (
-#         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-#     ),
-#     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',  # Đổi từ PageNumberPagination
-#     'PAGE_SIZE': 12,
-# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -147,6 +135,9 @@ REST_FRAMEWORK = {
 }
 
 
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+MEDIA_URL = '/mediafiles/'
+INDEX_DIR = MEDIA_ROOT / "image_index"
 
 # Simple JWT settings
 SIMPLE_JWT = {
