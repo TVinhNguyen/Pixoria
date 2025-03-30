@@ -36,7 +36,8 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps
     'media',
-    'imageretrieval'
+    'imageretrieval',
+    'clip',
     # For request to server (pip install django-cors-headers)
     
 
@@ -138,7 +139,7 @@ REST_FRAMEWORK = {
 MEDIA_ROOT = BASE_DIR / 'mediafiles'
 MEDIA_URL = '/mediafiles/'
 INDEX_DIR = MEDIA_ROOT / "image_index"
-
+INDEX_CLIP_DIR = MEDIA_ROOT / "clip_index"
 # Simple JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),

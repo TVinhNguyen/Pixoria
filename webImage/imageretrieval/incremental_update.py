@@ -4,7 +4,7 @@ import numpy as np
 import pickle
 from tqdm import tqdm
 import requests
-from .index_builder import IndexBuilder
+from imageretrieval.index_builder import IndexBuilder
 
 class IndexUpdater(IndexBuilder):
     def update_index(self, new_images, batch_size=32):
