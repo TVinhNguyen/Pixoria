@@ -1,13 +1,8 @@
-import os
-import sys
-
-# Lấy đường dẫn gốc của Django project
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(BASE_DIR)  # Đảm bảo import được các module trong dự án
-
-from imageretrieval.index_builder import IndexBuilder  # Import đúng
+from django.conf import settings  
+from imageretrieval.index_builder import IndexBuilder 
 
 # Tránh lỗi OpenMP
+import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 class ImageSearch:
@@ -25,10 +20,8 @@ class ImageSearch:
         self.builder = IndexBuilder(use_gpu=True)
         try:
             # Định nghĩa đường dẫn chính xác tới FAISS index và mapping
-            base_path = os.path.join(BASE_DIR, "imageretrieval")
-            index_path = os.path.join(base_path, "photo_index.faiss")
-            mapping_path = os.path.join(base_path, "photo_mapping.pkl")
-            
+            index_path = settings.INDEX_DIR / "photo_index.faiss"
+            mapping_path = settings.INDEX_DIR / "photo_mapping.pkl"
             print(f"🔄 Đang tải index từ: {index_path}")
             print(f"🔄 Đang tải mapping từ: {mapping_path}")
             

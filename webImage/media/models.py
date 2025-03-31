@@ -3,11 +3,39 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils.timezone import now
 from django.utils.timesince import timesince
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
+from django.conf import settings
+from imageretrieval.incremental_update import IndexUpdater
+from pathlib import Path
 
 
 def user_directory_path(instance, filename):
     """ Đường dẫn upload ảnh theo user: media/user_<id>/<filename> """
     return f'image/{filename}'
+
+
+# Đường dẫn đến file index và mapping
+INDEX_DIR = settings.INDEX_DIR
+INDEX_PATH = settings.INDEX_DIR / "photo_index.faiss"
+MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
+
+# Singleton pattern để giữ updater trong bộ nhớ
+_updater_instance = None
+
+def get_updater():
+    global _updater_instance
+    if _updater_instance is None:
+        _updater_instance = IndexUpdater()
+        # Tạo thư mục nếu chưa tồn tại
+        os.makedirs(INDEX_DIR, exist_ok=True)
+        # Nếu index đã tồn tại, load nó
+        if os.path.exists(INDEX_PATH) and os.path.exists(MAPPING_PATH):
+            try:
+                _updater_instance.load(INDEX_PATH, MAPPING_PATH)
+            except Exception as e:
+                print(f"⚠️ Không thể load index: {e}. Tạo index mới.")
+    return _updater_instance
 
 
 class UserProfile(models.Model):
@@ -62,6 +90,34 @@ class Image(models.Model):
         """ Tự động cập nhật số lượng ảnh khi lưu """
         super().save(*args, **kwargs)
         self.user.update_counts()
+
+
+@receiver(post_save, sender=Image)
+def update_image_index(sender, instance, created, **kwargs):
+    """Signal handler để cập nhật index khi có ảnh mới được tạo"""
+    if created and instance.is_public:  # Chỉ xử lý khi ảnh mới công khai được tạo
+        try:
+            updater = get_updater()
+            updater.update_index([instance])
+            # Lưu index và mapping sau khi cập nhật
+            updater.save(INDEX_PATH, MAPPING_PATH)
+            print(f"✅ Đã thêm ảnh #{instance.id} vào index")
+        except Exception as e:
+            print(f"❌ Lỗi khi cập nhật index: {e}")
+
+
+@receiver(post_delete, sender=Image)
+def remove_image_from_index(sender, instance, **kwargs):
+    """Signal handler để xóa ảnh khỏi index khi ảnh bị xóa"""
+    if instance.is_public:  # Chỉ xử lý ảnh công khai
+        try:
+            updater = get_updater()
+            updater.remove_from_index([instance.id])
+            # Lưu index và mapping sau khi cập nhật
+            updater.save(INDEX_PATH, MAPPING_PATH)
+            print(f"✅ Đã xóa ảnh #{instance.id} khỏi index")
+        except Exception as e:
+            print(f"❌ Lỗi khi xóa ảnh khỏi index: {e}")
 
 
 class ImageCategory(models.Model):

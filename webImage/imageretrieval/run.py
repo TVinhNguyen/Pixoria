@@ -1,5 +1,5 @@
 from .index_builder import IndexBuilder
-
+from media.models import INDEX_PATH , MAPPING_PATH
 # Khởi tạo và xây dựng index từ API phân trang
 builder = IndexBuilder(use_gpu=True)
 
@@ -11,7 +11,7 @@ builder.build_index_from_s3(
 )
 
 # Lưu index
-builder.save('photo_index.faiss', 'photo_mapping.pkl')
+builder.save(INDEX_PATH, MAPPING_PATH)
 
 # Hoặc nếu muốn tải lại index đã lưu
 # builder.load('photo_index.faiss', 'photo_mapping.pkl')
