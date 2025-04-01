@@ -12,11 +12,11 @@ from rest_framework.views import APIView
 
 import os
 import tempfile
-from .models import Category, Image, UserProfile, ImageCategory, Notification, Collection , Follow
+from .models import Category, Image, UserProfile, ImageCategory, Notification, Collection , Follow, LikedImage
 from .serializers import (
     CategorySerializer, ImageSerializer, CollectionSerializer,
     UserSerializer, RegisterSerializer, UserProfileSerializer, 
-    ImagesCategorySerializer, NotificationSerializer , FollowSerializer 
+    ImagesCategorySerializer, NotificationSerializer , FollowSerializer , LikedImageSerializer
     , ImageSearchSerializer, SimilarImageResultSerializer
 )
 from .image_search import ImageSearch
@@ -127,6 +127,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
 class ImageViewSet(viewsets.ModelViewSet):
     serializer_class = ImageSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = Image.objects.all()
     
     def get_permissions(self):
         if self.action in ["public_images", "list", "search_similar"]:  
@@ -143,6 +144,15 @@ class ImageViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user.userprofile)
+    
+    @action(detail=False, permission_classes=[AllowAny], url_path='user/(?P<username>[^/.]+)')
+    def user_images(self, request, username=None):
+        """API để lấy tất cả ảnh của một user theo username"""
+        user = get_object_or_404(UserProfile, user__username=username)
+        images = Image.objects.filter(user=user)
+
+        serializer = self.get_serializer(images, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, permission_classes=[AllowAny])
     def public_images(self, request):
@@ -154,22 +164,33 @@ class ImageViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], url_path='like')
     def like_image(self, request, pk=None):
-        """API endpoint để like ảnh và tạo thông báo"""
-        image = self.get_object()
-        # Xử lý logic like ở đây (thêm vào model Like nếu có)
-        image.likes += 1
-        image.save()
-        
-        # Tạo thông báo cho chủ sở hữu ảnh
-        if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
-            create_notification(
-                sender_profile=request.user.userprofile,
-                recipient_profile=image.user,
-                notification_type='like',
-                content=f"liked your photo '{image.title or 'Untitled'}'"
-            )
-        
-        return Response({"status": "success", "likes": image.likes})
+        """API endpoint để like ảnh, tự động xác định loại ảnh"""
+        try:
+            # Tìm ảnh theo ID, kiểm tra cả ảnh public lẫn ảnh người dùng đã upload
+            image = Image.objects.filter(id=pk).first()
+            
+            if not image:
+                return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Tiến hành like ảnh
+            image.likes += 1
+            image.save()
+
+            # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
+            if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
+                create_notification(
+                    sender_profile=request.user.userprofile,
+                    recipient_profile=image.user,
+                    notification_type='like',
+                    content=f"liked your photo '{image.title or 'Untitled'}'"
+                )
+
+            # Tạo bản ghi like trong database
+            LikedImage.objects.get_or_create(user=request.user.userprofile, image=image)
+            return Response({"status": "success", "likes": image.likes})
+
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'], url_path='comment')
     def comment_image(self, request, pk=None):
@@ -549,3 +570,19 @@ class NotificationViewSet(mixins.ListModelMixin,
             {"error": "Deleting notifications is not allowed"},
             status=status.HTTP_405_METHOD_NOT_ALLOWED
         )
+
+class LikedImageViewSet(viewsets.ModelViewSet):
+    queryset = LikedImage.objects.all()
+    serializer_class = LikedImageSerializer
+    permission_classes = [permissions.IsAuthenticated]  # Chỉ user đăng nhập mới xem được danh sách like
+
+    def perform_create(self, serializer):
+        """Khi user like một ảnh, đảm bảo nó thuộc về user hiện tại"""
+        serializer.save(user=self.request.user.userprofile)  
+    
+    def list(self, request, *args, **kwargs):
+        """Lấy danh sách các ảnh mà user đã like, không trả về thông tin LikedImage"""
+        liked_images = LikedImage.objects.values_list('image', flat=True)  # Lấy danh sách ID ảnh
+        images = Image.objects.filter(id__in=liked_images)  # Lấy thông tin ảnh từ ID
+        serializer = ImageSerializer(images, many=True)
+        return Response(serializer.data)

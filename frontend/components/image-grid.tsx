@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useFetchImages from "../hooks/use-FetchImages"
+import { handleLike } from "@/lib/api-action/image-actions"
 import Image from "next/image"
 import Masonry from "react-masonry-css"
 import { Download, Heart, Share2 } from "lucide-react"
@@ -151,7 +152,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
                       <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
                         <Download className="h-5 w-5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleLike(image.id)}>
                         <Heart className="h-5 w-5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">

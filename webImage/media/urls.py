@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import (
     CategoryViewSet, ImageViewSet, CollectionViewSet, UserViewSet,
     RegisterView, UserProfileViewSet, 
-    ImagesCategoryViewSet, NotificationViewSet , FollowViewSet , ImageSearchViewSet
+    ImagesCategoryViewSet, NotificationViewSet , FollowViewSet , ImageSearchViewSet, LikedImageViewSet
 )
 
 router = DefaultRouter()
@@ -18,6 +18,7 @@ router.register(r'images-categories', ImagesCategoryViewSet, basename='images-ca
 router.register(r'notifications', NotificationViewSet, basename='notification')
 router.register(r'follows', FollowViewSet, basename='follow')
 router.register(r'image-search', ImageSearchViewSet, basename='image-search')  # Thêm dòng này
+router.register(r'liked-image', LikedImageViewSet, basename='liked-image')  # Thêm dòng này
 
 urlpatterns = [
     path('', include(router.urls)),

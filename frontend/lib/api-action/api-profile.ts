@@ -36,3 +36,28 @@ export async function handleProfileEdit(formData: any) {
     console.log(data)
     return data
 }
+
+export async function loadAllUploadedImages() {
+    const username = localStorage.getItem("username")
+    const response = await fetch(`${API_BASE_URL}/images/user/${username}/`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
+    console.log(data)
+    return data
+}
+
+export async function loadAllLikedImages() {
+    const response = await fetch(`${API_BASE_URL}/liked-image`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
+    console.log(data.image)
+    return data
+}

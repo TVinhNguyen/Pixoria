@@ -263,7 +263,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
               </div>
 
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">Account Information (Non-editable)</Label>
+                <Label className="text-muted-foreground text-sm">Account Information</Label>
                 <div className="p-4 rounded-md bg-muted/30 border backdrop-blur-sm">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
