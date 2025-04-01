@@ -198,3 +198,4 @@ class Notification(models.Model):
         ordering = ['-sent_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+        

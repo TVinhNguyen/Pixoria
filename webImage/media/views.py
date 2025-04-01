@@ -150,7 +150,6 @@ class ImageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    # Các action khác của bạn...
     
     @action(detail=True, methods=['post'], url_path='like')
     def like_image(self, request, pk=None):
