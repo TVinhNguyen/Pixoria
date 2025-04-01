@@ -1,29 +1,18 @@
 import torch
-import torchvision.models as models
-import torchvision.transforms as transforms
 from PIL import Image
+import clip
 import numpy as np
 import requests
 from io import BytesIO
 
 class FeatureExtractor:
     def __init__(self, use_gpu=True):
- 
         self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
         print(f"Using device: {self.device}")
 
-        # Load mô hình ResNet50 và loại bỏ fully connected layer cuối cùng
-        self.model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V1)
-        self.model = torch.nn.Sequential(*list(self.model.children())[:-1]).to(self.device)
-        self.model.eval()
-
-        # Tiền xử lý ảnh đầu vào
-        self.transform = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        # Tải mô hình CLIP ViT-B/32
+        self.model, self.preprocess = clip.load("ViT-B/32", device=self.device)
+        print("CLIP model loaded")
 
     def load_image(self, image_source):
         """
@@ -47,9 +36,9 @@ class FeatureExtractor:
             print(f"❌ Error loading image {image_source}: {e}")
             return None
 
-    def extract_features(self, image_source):
+    def extract_image_features(self, image_source):
         """
-        Trích xuất vector đặc trưng 2048 chiều từ ảnh.
+        Trích xuất vector đặc trưng từ ảnh sử dụng CLIP.
         
         Args:
             image_source (str): URL hoặc đường dẫn ảnh.
@@ -61,14 +50,37 @@ class FeatureExtractor:
         if image is None:
             return None
         
-        image = self.transform(image).unsqueeze(0).to(self.device)
+        # Tiền xử lý ảnh và trích xuất đặc trưng
+        image_input = self.preprocess(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
-            features = self.model(image).squeeze().cpu().numpy()
-        return features
+            image_features = self.model.encode_image(image_input)
+            # Chuẩn hóa vector
+            image_features /= image_features.norm(dim=-1, keepdim=True)
+            
+        return image_features.cpu().numpy()
+
+    def extract_text_features(self, text):
+        """
+        Trích xuất vector đặc trưng từ văn bản sử dụng CLIP.
+        
+        Args:
+            text (str): Văn bản cần trích xuất.
+            
+        Returns:
+            np.ndarray: Vector đặc trưng của văn bản.
+        """
+        # Mã hóa văn bản
+        text_input = clip.tokenize([text]).to(self.device)
+        with torch.no_grad():
+            text_features = self.model.encode_text(text_input)
+            # Chuẩn hóa vector
+            text_features /= text_features.norm(dim=-1, keepdim=True)
+            
+        return text_features.cpu().numpy()
 
     def extract_features_batch(self, image_sources, batch_size=32):
         """
-        Trích xuất đặc trưng theo batch.
+        Trích xuất đặc trưng theo batch từ nhiều ảnh.
         
         Args:
             image_sources (list): Danh sách URL hoặc đường dẫn ảnh.
@@ -90,7 +102,7 @@ class FeatureExtractor:
             for j, src in enumerate(batch_sources):
                 img = self.load_image(src)
                 if img is not None:
-                    batch_images.append(self.transform(img))
+                    batch_images.append(self.preprocess(img))
                     batch_valid_indices.append(i + j)
             
             # Kiểm tra nếu không có ảnh hợp lệ trong batch
@@ -100,11 +112,9 @@ class FeatureExtractor:
             # Xử lý batch ảnh hợp lệ
             batch_tensor = torch.stack(batch_images).to(self.device)
             with torch.no_grad():
-                batch_features = self.model(batch_tensor).squeeze().cpu().numpy()
-                
-            # Xử lý trường hợp chỉ có một ảnh trong batch
-            if len(batch_images) == 1:
-                batch_features = batch_features.reshape(1, -1)
+                batch_features = self.model.encode_image(batch_tensor)
+                batch_features /= batch_features.norm(dim=-1, keepdim=True)
+                batch_features = batch_features.cpu().numpy()
                 
             all_features.append(batch_features)
             valid_indices.extend(batch_valid_indices)

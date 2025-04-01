@@ -31,6 +31,5 @@ torch
 torchvision
 faiss-cpu 
 numpy 
-requests 
-pillow 
+requests  
 tqdm

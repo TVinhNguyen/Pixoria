@@ -5,7 +5,7 @@ import numpy as np
 import pickle
 from tqdm import tqdm
 import requests
-from .feature_extractor import FeatureExtractor
+from imageretrieval.feature_extractor import FeatureExtractor
 
 class IndexBuilder:
     def __init__(self, feature_dim=2048, use_gpu=True):

@@ -20,6 +20,10 @@ INDEX_DIR = settings.INDEX_DIR
 INDEX_PATH = settings.INDEX_DIR / "photo_index.faiss"
 MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
 
+INDEX_CLIP_DIR = settings.INDEX_CLIP_DIR
+INDEX_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_index_clip.faiss"
+MAPPING_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_mapping_clip.pkl"
+
 # Singleton pattern để giữ updater trong bộ nhớ
 _updater_instance = None
 
@@ -94,12 +98,10 @@ class Image(models.Model):
 
 @receiver(post_save, sender=Image)
 def update_image_index(sender, instance, created, **kwargs):
-    """Signal handler để cập nhật index khi có ảnh mới được tạo"""
-    if created and instance.is_public:  # Chỉ xử lý khi ảnh mới công khai được tạo
+    if created and instance.is_public: 
         try:
             updater = get_updater()
             updater.update_index([instance])
-            # Lưu index và mapping sau khi cập nhật
             updater.save(INDEX_PATH, MAPPING_PATH)
             print(f"✅ Đã thêm ảnh #{instance.id} vào index")
         except Exception as e:

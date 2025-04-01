@@ -3,7 +3,7 @@ from django.utils import timezone
 from datetime import timedelta
 import os
 from media.models import Image , INDEX_PATH, MAPPING_PATH
-from .incremental_update  import IndexUpdater
+from imageretrieval.incremental_update  import IndexUpdater
 
 class Command(BaseCommand):
     help = 'Cập nhật hoặc xây dựng lại FAISS index cho tìm kiếm ảnh tương tự'
