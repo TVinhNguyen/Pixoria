@@ -172,6 +172,10 @@ class ImageViewSet(viewsets.ModelViewSet):
             if not image:
                 return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
 
+            user_profile = request.user.userprofile if request.user.is_authenticated else None
+            liked = LikedImage.objects.filter(user=user_profile, image=image).exists()
+            if liked:
+                return Response({"status": "already_liked", "likes": image.likes})
             # Tiến hành like ảnh
             image.likes += 1
             image.save()
@@ -202,6 +206,10 @@ class ImageViewSet(viewsets.ModelViewSet):
             if not image:
                 return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
 
+            user_profile = request.user.userprofile if request.user.is_authenticated else None
+            downloaded = DownloadedImage.objects.filter(user=user_profile, image=image).exists()
+            if downloaded:
+                return Response({"status": "already_downloaded", "downloads": image.downloads})
             # Tiến hành download ảnh
             image.downloads += 1
             image.save()

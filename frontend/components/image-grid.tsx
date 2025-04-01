@@ -8,6 +8,7 @@ import Masonry from "react-masonry-css"
 import { Download, Heart, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner";
 
 interface ImageData {
   id: number
@@ -97,6 +98,35 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
       setCurrentPage(1)
     }
   }, [isUsingSearchResults])
+
+  // Xử lí sự kiện khi nhấn nút download, nhưng mà bị chỗ policy.
+  const handleDownload1 = async (id: string, src: string) => {
+    try {
+      const response = await fetch(src);
+      
+      if (!response.ok) {
+        throw new Error(`Lỗi tải ảnh: ${response.status}`);
+      }
+  
+      const blob = await response.blob();
+  
+      const blobUrl = window.URL.createObjectURL(blob);
+  
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `image-${id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+  
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+  
+      toast.success("Tải xuống thành công!");
+    } catch (error) {
+      console.error("Lỗi khi tải ảnh:", error);
+      toast.error("Tải xuống thất bại!");
+    }
+  };
 
   return (
     <section className="py-12 px-4">
