@@ -16,7 +16,7 @@ from .models import Category, Image, UserProfile, ImageCategory, Notification, C
 from .serializers import (
     CategorySerializer, ImageSerializer, CollectionSerializer,
     UserSerializer, RegisterSerializer, UserProfileSerializer, 
-    ImagesCategorySerializer, NotificationSerializer , FollowSerializer , LikedImageSerializer
+    ImagesCategorySerializer, NotificationSerializer , FollowSerializer , LikedImageSerializer, DownloadedImage
     , ImageSearchSerializer, SimilarImageResultSerializer
 )
 from .image_search import ImageSearch
@@ -191,6 +191,37 @@ class ImageViewSet(viewsets.ModelViewSet):
 
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'], url_path='download')
+    def download_image(self, request, pk=None):
+        """API endpoint để tải ảnh, tự động xác định loại ảnh"""
+        try:
+            # Tìm ảnh theo ID, kiểm tra cả ảnh public lẫn ảnh người dùng đã upload
+            image = Image.objects.filter(id=pk).first()
+            
+            if not image:
+                return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
+
+            # Tiến hành download ảnh
+            image.downloads += 1
+            image.save()
+
+            # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
+            if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
+                create_notification(
+                    sender_profile=request.user.userprofile,
+                    recipient_profile=image.user,
+                    notification_type='download',
+                    content=f"downloaded your photo '{image.title or 'Untitled'}'"
+                )
+
+            # Tạo bản ghi download trong database
+            DownloadedImage.objects.get_or_create(user=request.user.userprofile, image=image)
+            return Response({"status": "success", "download": image.downloads})
+
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
     
     @action(detail=True, methods=['post'], url_path='comment')
     def comment_image(self, request, pk=None):
@@ -574,7 +605,7 @@ class NotificationViewSet(mixins.ListModelMixin,
 class LikedImageViewSet(viewsets.ModelViewSet):
     queryset = LikedImage.objects.all()
     serializer_class = LikedImageSerializer
-    permission_classes = [permissions.IsAuthenticated]  # Chỉ user đăng nhập mới xem được danh sách like
+    permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
         """Khi user like một ảnh, đảm bảo nó thuộc về user hiện tại"""
@@ -582,7 +613,23 @@ class LikedImageViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Lấy danh sách các ảnh mà user đã like, không trả về thông tin LikedImage"""
-        liked_images = LikedImage.objects.values_list('image', flat=True)  # Lấy danh sách ID ảnh
-        images = Image.objects.filter(id__in=liked_images)  # Lấy thông tin ảnh từ ID
+        liked_images = LikedImage.objects.values_list('image', flat=True)
+        images = Image.objects.filter(id__in=liked_images)
+        serializer = ImageSerializer(images, many=True)
+        return Response(serializer.data)
+
+class DownloadedImageViewSet(viewsets.ModelViewSet):
+    queryset = DownloadedImage.objects.all()
+    serializer_class = ImageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        """Khi user tải ảnh về, đảm bảo nó thuộc về user hiện tại"""
+        serializer.save(user=self.request.user.userprofile)
+    
+    def list(self, request, *args, **kwargs):
+        """Lấy danh sách các ảnh mà user đã tải về"""
+        downloaded_images = DownloadedImage.objects.values_list('image', flat=True)
+        images = Image.objects.filter(id__in=downloaded_images)
         serializer = ImageSerializer(images, many=True)
         return Response(serializer.data)

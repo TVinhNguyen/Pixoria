@@ -193,6 +193,7 @@ class Follow(models.Model):
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('like', 'Like'),
+        ('download', 'Download'),
         ('comment', 'Comment'),
         ('follow', 'Follow'),
         ('mention', 'Mention'),
@@ -224,8 +225,20 @@ class LikedImage(models.Model):
     liked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'image')  # Đảm bảo mỗi ảnh chỉ được like 1 lần bởi 1 user
+        unique_together = ('user', 'image')
         ordering = ['-liked_at']
 
     def __str__(self):
         return f"{self.user.user.username} liked {self.image.title or 'Untitled'}"
+
+class DownloadedImage(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="downloaded_images")
+    image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="downloaded_by")
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'image')
+        ordering = ['-downloaded_at']
+
+    def __str__(self):
+        return f"{self.user.user.username} downloaded {self.image.title or 'Untitled'}"

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useFetchImages from "../hooks/use-FetchImages"
-import { handleLike } from "@/lib/api-action/image-actions"
+import { handleLike, handleDownload } from "@/lib/api-action/image-actions"
 import Image from "next/image"
 import Masonry from "react-masonry-css"
 import { Download, Heart, Share2 } from "lucide-react"
@@ -149,7 +149,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
                   </div>
                   <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center overflow-hidden">
                     <div className="flex space-x-2">
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleDownload(image.id)}>
                         <Download className="h-5 w-5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleLike(image.id)}>

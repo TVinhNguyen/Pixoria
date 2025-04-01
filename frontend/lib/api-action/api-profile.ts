@@ -58,6 +58,16 @@ export async function loadAllLikedImages() {
         },
     })
     const data = await response.json()
-    console.log(data.image)
+    return data
+}
+
+export async function loadAllDownloadedImages() {
+    const response = await fetch(`${API_BASE_URL}/downloaded-image`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
     return data
 }
