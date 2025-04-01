@@ -94,6 +94,25 @@ class Image(models.Model):
         """ Tự động cập nhật số lượng ảnh khi lưu """
         super().save(*args, **kwargs)
         self.user.update_counts()
+    
+    def like_image(self, user_profile):
+        """ Hàm xử lý khi user like ảnh """
+        if not LikedImage.objects.filter(user=user_profile, image=self).exists():
+            LikedImage.objects.create(user=user_profile, image=self)  # Thêm vào danh sách like
+            self.likes += 1  # Tăng số lượt like
+            self.save()
+            return True  # Like thành công
+        return False  # Đã like trước đó
+
+    def unlike_image(self, user_profile):
+        """ Hàm xử lý khi user bỏ like ảnh """
+        liked_image = LikedImage.objects.filter(user=user_profile, image=self)
+        if liked_image.exists():
+            liked_image.delete()  # Xóa khỏi danh sách like
+            self.likes -= 1  # Giảm số lượt like
+            self.save()
+            return True  # Bỏ like thành công
+        return False  # Ảnh chưa được like trước đó
 
 
 @receiver(post_save, sender=Image)
@@ -176,6 +195,7 @@ class Follow(models.Model):
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('like', 'Like'),
+        ('download', 'Download'),
         ('comment', 'Comment'),
         ('follow', 'Follow'),
         ('mention', 'Mention'),
@@ -200,3 +220,27 @@ class Notification(models.Model):
         ordering = ['-sent_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+
+class LikedImage(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="liked_images")
+    image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="liked_by")
+    liked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'image')
+        ordering = ['-liked_at']
+
+    def __str__(self):
+        return f"{self.user.user.username} liked {self.image.title or 'Untitled'}"
+
+class DownloadedImage(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="downloaded_images")
+    image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="downloaded_by")
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'image')
+        ordering = ['-downloaded_at']
+
+    def __str__(self):
+        return f"{self.user.user.username} downloaded {self.image.title or 'Untitled'}"

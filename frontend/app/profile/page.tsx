@@ -5,13 +5,24 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon } from "lucide-react"
-import { handleProfileClick } from "@/lib/api-action/api-profile"
+import {
+  handleProfileClick,
+  loadAllUploadedImages,
+  loadAllLikedImages,
+  loadAllDownloadedImages,
+} from "@/lib/api-action/api-profile"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 
 export default function Profile() {
   const [profileData, setProfileData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [userImages, setUserImages] = useState<any[]>([])
+  const [savedImages, setSavedImages] = useState<any[]>([])
+  const [downloadedImages, setDownloadedImages] = useState<any[]>([])
+  const [imagesLoading, setImagesLoading] = useState(false)
+  const [savedImagesLoading, setSavedImagesLoading] = useState(false)
+  const [downloadedImagesLoading, setDownloadedImagesLoading] = useState(false)
 
   const fetchProfile = async () => {
     try {
@@ -25,8 +36,48 @@ export default function Profile() {
     }
   }
 
+  const fetchUserImages = async () => {
+    try {
+      setImagesLoading(true)
+      const data = await loadAllUploadedImages()
+      console.log("User images data:", data)
+      setUserImages(data)
+    } catch (error) {
+      console.error("Error fetching user images:", error)
+    } finally {
+      setImagesLoading(false)
+    }
+  }
+
+  const fetchUserLikedImages = async () => {
+    try {
+      setSavedImagesLoading(true)
+      const data = await loadAllLikedImages()
+      console.log("User liked images data:", data)
+      setSavedImages(data)
+    } catch (error) {
+      console.error("Error fetching user liked images:", error)
+    } finally {
+      setSavedImagesLoading(false)
+    }
+  }
+
+  const fetchUserDownloadedImages = async () => {
+    try {
+      setDownloadedImagesLoading(true)
+      const data = await loadAllDownloadedImages()
+      console.log("User downloaded images data:", data)
+      setDownloadedImages(data)
+    } catch (error) {
+      console.error("Error fetching user downloaded images:", error)
+    } finally {
+      setDownloadedImagesLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchProfile()
+    fetchUserImages()
   }, [])
 
   useEffect(() => {
@@ -41,6 +92,16 @@ export default function Profile() {
         <div className="animate-pulse text-primary">Loading profile...</div>
       </div>
     )
+  }
+
+  const handleTabChange = (value: string) => {
+    if (value === "photos") {
+      fetchUserImages()
+    } else if (value === "saved") {
+      fetchUserLikedImages()
+    } else if (value === "downloads") {
+      fetchUserDownloadedImages()
+    }
   }
 
   return (
@@ -116,7 +177,7 @@ export default function Profile() {
           </div>
         </div>
 
-        <Tabs defaultValue="photos" className="w-full">
+        <Tabs defaultValue="photos" className="w-full" onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="photos">
               <ImageIcon className="mr-2 h-4 w-4" />
@@ -137,30 +198,44 @@ export default function Profile() {
           </TabsList>
 
           <TabsContent value="photos" className="mt-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
-                  <Image
-                    src={`/placeholder.svg?height=300&width=400`}
-                    alt={`Photo ${i + 1}`}
-                    width={400}
-                    height={300}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                    <span className="text-sm font-medium text-white">Photo {i + 1}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
-                    >
-                      <Heart className="h-4 w-4" />
-                    </Button>
+            {imagesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-pulse text-primary">Loading images...</div>
+              </div>
+            ) : userImages.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {userImages.map((image, i) => (
+                  <div key={image.id} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
+                    <Image
+                      src={image.file || `/placeholder.svg?height=300&width=400`}
+                      alt={image.title || `Photo ${i + 1}`}
+                      width={400}
+                      height={300}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      <span className="text-sm font-medium text-white">{image.title || `Photo ${i + 1}`}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                      >
+                        <Heart className="h-4 w-4" />
+                        {image.likes > 0 && <span className="sr-only">{image.likes} likes</span>}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground">No photos uploaded yet</p>
+                <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                  Upload Your First Photo
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="collections" className="mt-6">
@@ -185,57 +260,90 @@ export default function Profile() {
           </TabsContent>
 
           <TabsContent value="saved" className="mt-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
-                  <Image
-                    src={`/placeholder.svg?height=300&width=400`}
-                    alt={`Saved photo ${i + 1}`}
-                    width={400}
-                    height={300}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                    <span className="text-sm font-medium text-white">Saved {i + 1}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
-                    >
-                      <Bookmark className="h-4 w-4 fill-current" />
-                    </Button>
+            {savedImagesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-pulse text-primary">Loading saved images...</div>
+              </div>
+            ) : savedImages.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {savedImages.map((image, i) => (
+                  <div key={image.id} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
+                    <Image
+                      src={image.file || `/placeholder.svg?height=300&width=400`}
+                      alt={image.title || `Saved photo ${i + 1}`}
+                      width={400}
+                      height={300}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      <span className="text-sm font-medium text-white">{image.title || `Saved ${i + 1}`}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                      >
+                        <Bookmark className="h-4 w-4 fill-current" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground">No saved photos yet</p>
+                <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                  Browse Photos to Save
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="downloads" className="mt-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
-                  <Image
-                    src={`/placeholder.svg?height=300&width=400`}
-                    alt={`Downloaded photo ${i + 1}`}
-                    width={400}
-                    height={300}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
-                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                    <span className="text-sm font-medium text-white">Downloaded {i + 1}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
+            {downloadedImagesLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-pulse text-primary">Loading downloaded images...</div>
+              </div>
+            ) : downloadedImages.length > 0 ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {downloadedImages.map((image, i) => (
+                  <div key={image.id} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
+                    <Image
+                      src={image.file || `/placeholder.svg?height=300&width=400`}
+                      alt={image.title || `Downloaded photo ${i + 1}`}
+                      width={400}
+                      height={300}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"></div>
+                    <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-white">{image.title || `Downloaded ${i + 1}`}</span>
+                        {image.downloaded_at && (
+                          <span className="text-xs text-white/70">
+                            Downloaded on {new Date(image.downloaded_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-muted-foreground">No downloaded photos yet</p>
+                <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                  Browse Photos to Download
+                </Button>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -259,4 +367,3 @@ export default function Profile() {
     </div>
   )
 }
-

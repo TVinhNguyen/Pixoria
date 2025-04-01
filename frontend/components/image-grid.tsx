@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import useFetchImages from "../hooks/use-FetchImages"
+import { handleLike, handleDownload } from "@/lib/api-action/image-actions"
 import Image from "next/image"
 import Masonry from "react-masonry-css"
 import { Download, Heart, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner";
 
 interface ImageData {
   id: number
@@ -97,6 +99,35 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
     }
   }, [isUsingSearchResults])
 
+  // Xử lí sự kiện khi nhấn nút download, nhưng mà bị chỗ policy.
+  const handleDownload1 = async (id: string, src: string) => {
+    try {
+      const response = await fetch(src);
+      
+      if (!response.ok) {
+        throw new Error(`Lỗi tải ảnh: ${response.status}`);
+      }
+  
+      const blob = await response.blob();
+  
+      const blobUrl = window.URL.createObjectURL(blob);
+  
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `image-${id}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+  
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+  
+      toast.success("Tải xuống thành công!");
+    } catch (error) {
+      console.error("Lỗi khi tải ảnh:", error);
+      toast.error("Tải xuống thất bại!");
+    }
+  };
+
   return (
     <section className="py-12 px-4">
       <div className="container mx-auto">
@@ -148,10 +179,10 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
                   </div>
                   <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center overflow-hidden">
                     <div className="flex space-x-2">
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleDownload(image.id)}>
                         <Download className="h-5 w-5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleLike(image.id)}>
                         <Heart className="h-5 w-5" />
                       </Button>
                       <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">

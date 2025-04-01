@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Image, Category, Collection, UserProfile, ImageCategory, Notification , Follow
+from .models import Image, Category, Collection, UserProfile, ImageCategory, Notification , Follow, LikedImage, DownloadedImage
 from django.utils.timesince import timesince
 from .image_search import ImageSearch
 
@@ -164,3 +164,15 @@ class ImagesCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ImageCategory
         fields = ['id', 'image', 'category', 'category_name', 'image_title']
+
+class LikedImageSerializer(serializers.ModelSerializer):
+    image = ImageSerializer(read_only=True)
+    class Meta:
+        model = LikedImage
+        fields = ['id', 'liked_at', 'user', 'image']
+
+class DownloadedImageSerializer(serializers.ModelSerializer):
+    image = ImageSerializer(read_only=True)
+    class Meta:
+        model = DownloadedImage
+        fields = ['id', 'downloaded_at', 'user', 'image']
