@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from media.models import Image, INDEX_CLIP_PATH, MAPPING_PATH
-from clip.clip_retriever import CLIPRetriever
+from clip_retrieval.clip_retriever import CLIPRetriever
 
 class Command(BaseCommand):
     help = 'Cập nhật hoặc xây dựng lại CLIP index cho tìm kiếm ảnh dựa trên truy vấn văn bản'

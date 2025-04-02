@@ -130,68 +130,140 @@ class ImageViewSet(viewsets.ModelViewSet):
     queryset = Image.objects.all()
     
     def get_permissions(self):
-        if self.action in ["public_images", "list", "search_similar"]:  
+        if self.action in ["public_images", "list", "search_similar", "user_images", "retrieve"]:  
             return [AllowAny()]
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        """
+        Tối ưu truy vấn để bao gồm thông tin tác giả và cải thiện hiệu suất
+        """
+        # Base queryset với select_related để tối ưu hiệu suất, đảm bảo có thông tin tác giả
+        queryset = Image.objects.select_related(
+            'user',          # UserProfile
+            'user__user'     # User từ UserProfile
+        )
+        
+        # Nếu người dùng đã đăng nhập, xác định phạm vi ảnh hiển thị
         if self.request.user.is_authenticated:
             public = self.request.query_params.get("public", None)
             if public and public.lower() == "true":
-                return Image.objects.filter(is_public=True)
-            return Image.objects.filter(user=self.request.user.userprofile)
-        return Image.objects.filter(is_public=True) 
+                return queryset.filter(is_public=True)
+            # Mặc định chỉ hiển thị ảnh của người dùng
+            return queryset.filter(user=self.request.user.userprofile)
+        
+        # Người dùng chưa đăng nhập chỉ thấy ảnh public
+        return queryset.filter(is_public=True)
+    
+    def get_serializer_context(self):
+        """
+        Bổ sung context cho serializer để có thể truy cập request
+        """
+        context = super().get_serializer_context()
+        return context
     
     def perform_create(self, serializer):
+        """
+        Tự động gán người dùng hiện tại khi tạo ảnh mới
+        """
         serializer.save(user=self.request.user.userprofile)
     
     @action(detail=False, permission_classes=[AllowAny], url_path='user/(?P<username>[^/.]+)')
     def user_images(self, request, username=None):
         """API để lấy tất cả ảnh của một user theo username"""
+        # Cải thiện truy vấn với get_object_or_404 để trả về lỗi 404 rõ ràng
         user = get_object_or_404(UserProfile, user__username=username)
-        images = Image.objects.filter(user=user)
-
+        
+        # Cải thiện bảo mật: chỉ hiển thị ảnh public nếu không phải là chủ sở hữu
+        if request.user.is_authenticated and request.user.username == username:
+            images = Image.objects.filter(user=user)
+        else:
+            images = Image.objects.filter(user=user, is_public=True)
+        
+        # Tối ưu truy vấn với select_related
+        images = images.select_related('user', 'user__user')
+        
+        # Phân trang nếu cần
+        page = self.paginate_queryset(images)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+            
         serializer = self.get_serializer(images, many=True)
         return Response(serializer.data)
 
     @action(detail=False, permission_classes=[AllowAny])
     def public_images(self, request):
-        queryset = Image.objects.filter(is_public=True)
+        """
+        Lấy danh sách ảnh công khai với phân trang và sắp xếp
+        """
+        queryset = Image.objects.filter(is_public=True).select_related(
+            'user', 'user__user'
+        )
+        
+        # Sắp xếp theo tham số từ request
+        sort_by = request.query_params.get('sort', 'created_at')
+        order = request.query_params.get('order', 'desc')
+        
+        if sort_by in ['created_at', 'likes', 'downloads']:
+            sort_field = f"{'-' if order == 'desc' else ''}{sort_by}"
+            queryset = queryset.order_by(sort_field)
+        
+        # Phân trang cho kết quả
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-
-    # Các action khác của bạn...
     
     @action(detail=True, methods=['post'], url_path='like')
     def like_image(self, request, pk=None):
         """API endpoint để like ảnh, tự động xác định loại ảnh"""
         try:
-            # Tìm ảnh theo ID, kiểm tra cả ảnh public lẫn ảnh người dùng đã upload
-            image = Image.objects.filter(id=pk).first()
+            # Tìm ảnh theo ID, sử dụng select_related để tối ưu
+            image = get_object_or_404(
+                Image.objects.select_related('user', 'user__user'),
+                id=pk
+            )
             
-            if not image:
-                return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
-
-            user_profile = request.user.userprofile if request.user.is_authenticated else None
+            # Xử lý người dùng chưa đăng nhập
+            if not request.user.is_authenticated:
+                return Response(
+                    {"detail": "Authentication required to like images."}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            user_profile = request.user.userprofile
             liked = LikedImage.objects.filter(user=user_profile, image=image).exists()
+            
             if liked:
                 return Response({"status": "already_liked", "likes": image.likes})
+                
             # Tiến hành like ảnh
             image.likes += 1
-            image.save()
+            image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
 
             # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
-            if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
+            if image.user != user_profile:
                 create_notification(
-                    sender_profile=request.user.userprofile,
+                    sender_profile=user_profile,
                     recipient_profile=image.user,
                     notification_type='like',
                     content=f"liked your photo '{image.title or 'Untitled'}'"
                 )
 
             # Tạo bản ghi like trong database
-            LikedImage.objects.get_or_create(user=request.user.userprofile, image=image)
-            return Response({"status": "success", "likes": image.likes})
+            LikedImage.objects.create(user=user_profile, image=image)
+            
+            # Trả về cả thông tin ảnh đã cập nhật để frontend có thể cập nhật
+            serializer = self.get_serializer(image)
+            return Response({
+                "status": "success", 
+                "likes": image.likes,
+                "image": serializer.data  # Thêm data ảnh cập nhật
+            })
 
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -200,36 +272,44 @@ class ImageViewSet(viewsets.ModelViewSet):
     def download_image(self, request, pk=None):
         """API endpoint để tải ảnh, tự động xác định loại ảnh"""
         try:
-            # Tìm ảnh theo ID, kiểm tra cả ảnh public lẫn ảnh người dùng đã upload
-            image = Image.objects.filter(id=pk).first()
+            # Tìm ảnh theo ID, sử dụng select_related để tối ưu
+            image = get_object_or_404(
+                Image.objects.select_related('user', 'user__user'),
+                id=pk
+            )
             
-            if not image:
-                return Response({"detail": "No Image matches the given query."}, status=status.HTTP_404_NOT_FOUND)
-
-            user_profile = request.user.userprofile if request.user.is_authenticated else None
-            downloaded = DownloadedImage.objects.filter(user=user_profile, image=image).exists()
-            if downloaded:
-                return Response({"status": "already_downloaded", "downloads": image.downloads})
-            # Tiến hành download ảnh
+            # Tăng số lượt tải xuống ngay cả khi người dùng chưa đăng nhập
             image.downloads += 1
-            image.save()
+            image.save(update_fields=['downloads'])  # Chỉ cập nhật trường downloads
 
-            # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
-            if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
-                create_notification(
-                    sender_profile=request.user.userprofile,
-                    recipient_profile=image.user,
-                    notification_type='download',
-                    content=f"downloaded your photo '{image.title or 'Untitled'}'"
-                )
-
-            # Tạo bản ghi download trong database
-            DownloadedImage.objects.get_or_create(user=request.user.userprofile, image=image)
-            return Response({"status": "success", "download": image.downloads})
+            # Xử lý các hành động đăng nhập đòi hỏi
+            if request.user.is_authenticated:
+                user_profile = request.user.userprofile
+                downloaded = DownloadedImage.objects.filter(user=user_profile, image=image).exists()
+                
+                # Chỉ tạo bản ghi download mới nếu chưa tồn tại
+                if not downloaded:
+                    DownloadedImage.objects.create(user=user_profile, image=image)
+                    
+                    # Tạo thông báo nếu ảnh không phải của chính họ
+                    if image.user != user_profile:
+                        create_notification(
+                            sender_profile=user_profile,
+                            recipient_profile=image.user,
+                            notification_type='download',
+                            content=f"downloaded your photo '{image.title or 'Untitled'}'"
+                        )
+            
+            # Trả về thông tin ảnh cập nhật để frontend có thể cập nhật
+            serializer = self.get_serializer(image)
+            return Response({
+                "status": "success", 
+                "downloads": image.downloads, 
+                "image": serializer.data  # Thêm data ảnh cập nhật
+            })
 
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
     
     @action(detail=True, methods=['post'], url_path='comment')
     def comment_image(self, request, pk=None):
@@ -237,16 +317,24 @@ class ImageViewSet(viewsets.ModelViewSet):
         image = self.get_object()
         content = request.data.get('content')
         
+        # Xác thực đầu vào
         if not content:
             return Response({
                 "error": "Comment content is required"
             }, status=status.HTTP_400_BAD_REQUEST)
         
+        # Xử lý người dùng chưa đăng nhập
+        if not request.user.is_authenticated:
+            return Response(
+                {"detail": "Authentication required to comment on images."}, 
+                status=status.HTTP_401_UNAUTHORIZED
+            )
+        
         # Xử lý logic comment ở đây (thêm vào model Comment nếu có)
         # comment = Comment.objects.create(...)
         
-        # Tạo thông báo cho chủ sở hữu ảnh
-        if hasattr(request.user, 'userprofile') and image.user != request.user.userprofile:
+        # Tạo thông báo cho chủ sở hữu ảnh nếu không phải chính họ
+        if image.user != request.user.userprofile:
             create_notification(
                 sender_profile=request.user.userprofile,
                 recipient_profile=image.user,
@@ -255,7 +343,6 @@ class ImageViewSet(viewsets.ModelViewSet):
             )
         
         return Response({"status": "success", "message": "Comment posted successfully"})
-
 
 
 class ImageSearchViewSet(viewsets.ViewSet):

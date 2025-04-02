@@ -8,9 +8,9 @@ import Image from "next/image"
 import { Download, Heart, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Masonry from "react-masonry-css"
+import SliderGallery from "./SliderGallery"
 import { searchByImage, searchByText, searchByImageUrl, VisualSearchResult } from "@/lib/api-action/visual-search"
 
-// Định nghĩa kiểu dữ liệu cho kết quả tìm kiếm
 interface ImageData {
   id: number
   src: string
@@ -33,7 +33,53 @@ export default function Hero() {
   const [hasSearched, setHasSearched] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
-
+  const [featuredImages, setFeaturedImages] = useState<ImageData[]>([
+    {
+      id: 1,
+      src: "images/nature.jpg",
+      alt: "Cảnh thiên nhiên tuyệt đẹp",
+      width: 1920,
+      height: 1080,
+      title: "Khám phá thiên nhiên tuyệt đẹp",
+      description: "Tìm kiếm hình ảnh phong cảnh với góc nhìn độc đáo và màu sắc rực rỡ."
+    },
+    {
+      id: 2,
+      src: "images/workspace.jpg",
+      alt: "Không gian làm việc sáng tạo",
+      width: 1920,
+      height: 1080,
+      title: "Không gian làm việc sáng tạo",
+      description: "Những bức ảnh về không gian làm việc hiện đại và sáng tạo giúp truyền cảm hứng."
+    },
+    {
+      id: 3,
+      src: "images/city.jpg",
+      alt: "Đô thị hiện đại",
+      width: 1920,
+      height: 1080,
+      title: "Khám phá đô thị hiện đại",
+      description: "Những góc nhìn độc đáo về cuộc sống đô thị và kiến trúc hiện đại."
+    },
+    {
+      id: 4,
+      src: "images/portrait.jpg",
+      alt: "Chân dung nghệ thuật",
+      width: 1920,
+      height: 1080,
+      title: "Chân dung nghệ thuật",
+      description: "Bộ sưu tập ảnh chân dung ấn tượng với cách tiếp cận sáng tạo và đầy cảm xúc."
+    },
+    {
+      id: 5,
+      src: "images/food.jpg",
+      alt: "Ẩm thực sáng tạo",
+      width: 1920,
+      height: 1080,
+      title: "Khám phá ẩm thực sáng tạo",
+      description: "Những hình ảnh ẩm thực đẹp mắt và hấp dẫn từ khắp nơi trên thế giới."
+    }
+  ])
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSearching(true)
@@ -100,17 +146,14 @@ export default function Hero() {
   }
 
   const clearUploadedImage = () => {
-    // Xóa ảnh đã upload
     setUploadedImage(null);
     setUploadedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     
-    // Xóa kết quả tìm kiếm khi xóa ảnh đã upload
     if (searchResults.length > 0) {
       setSearchResults([]);
-      // Tùy chọn: thông báo đã xóa kết quả tìm kiếm
       console.log("Đã xóa kết quả tìm kiếm liên quan");
       
       // Nếu bạn muốn giữ lại flag hasSearched là true, hãy comment dòng dưới đây
@@ -165,9 +208,11 @@ export default function Hero() {
         ref={dropZoneRef}
       >
         <div className="container mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text">
-            Discover the perfect image
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text max-w-4xl mx-auto leading-normal pb-1">
+          Discover the perfect image
           </h1>
+
+
           <p className="text-xl mb-8 text-gray-600 dark:text-gray-300">
             Free high-resolution photos you can use anywhere
           </p>
@@ -252,6 +297,12 @@ export default function Hero() {
         </div>
       </section>
 
+      {!hasSearched && (
+        <div className="container mx-auto py-8 px-4">
+          <h2 className="text-2xl font-bold mb-6">Bộ sưu tập nổi bật</h2>
+          <SliderGallery images={featuredImages} />
+        </div>
+      )}
       {/* Hiển thị kết quả tìm kiếm - trực tiếp trong Hero thay vì dùng ImageGrid */}
       {hasSearched && (
         <div className="bg-gray-50 dark:bg-gray-900">
@@ -316,14 +367,6 @@ export default function Hero() {
                         </Button>
                       </div>
                     </div>
-                    
-                    {/* Optional: Show image details */}
-                    {image.title && (
-                      <div className="mt-2">
-                        <h3 className="text-sm font-medium">{image.title}</h3>
-                        {image.description && <p className="text-xs text-gray-500">{image.description}</p>}
-                      </div>
-                    )}
                   </div>
                 ))}
               </Masonry>

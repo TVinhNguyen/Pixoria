@@ -1,30 +1,62 @@
 import { useState, useEffect } from "react";
 import API_BASE_URL from "../lib/api-config";
 
+// Interface cho dữ liệu tác giả
+interface Author {
+  user_id: number;
+  username: string;
+  name: string;
+  avatar: string | null;
+}
+
+// Interface cho danh mục
+interface Category {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 // Interface cho dữ liệu từ API
 interface ApiImageData {
   id: number;
   file: string; // URL của ảnh
   title: string;
   description: string;
+  username: string;
+  author: Author;
   created_at: string;
+  time_since: string;
   is_public: boolean;
   likes: number;
   downloads: number;
+  likes_count: number;
+  downloads_count: number;
+  categories: Category[];
+  is_liked: boolean;
 }
 
-// Interface cho dữ liệu sau khi chuyển đổi
-interface ImageData {
+// Interface cho dữ liệu sau khi chuyển đổi để đảm bảo tương thích
+// Đổi tên từ ImageData thành AppImageData để tránh xung đột
+export interface AppImageData {
   id: number;
-  src: string;
+  file: string;       // URL từ API mới
+  src: string;        // Tương thích ngược với code cũ
   alt: string;
   width: number;
   height: number;
   title: string;
   description?: string;
-  created_at?: string;
-  likes?: number;
-  downloads?: number;
+  username: string;
+  author: Author;
+  created_at: string;
+  time_since: string;
+  likes: number;
+  downloads: number;
+  likes_count: number;
+  downloads_count: number;
+  categories: Category[];
+  is_liked: boolean;
+  is_public: boolean;
 }
 
 interface ApiResponse {
@@ -33,7 +65,7 @@ interface ApiResponse {
 }
 
 const useFetchImages = (currentPage: number, limit: number = 12) => {
-  const [images, setImages] = useState<ImageData[]>([]);
+  const [images, setImages] = useState<AppImageData[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setLoading] = useState(true);
 
@@ -41,7 +73,7 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
     const fetchImages = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/images/?page=${currentPage}&limit=${limit}`);
+        const response = await fetch(`${API_BASE_URL}/images/public_images/?page=${currentPage}&limit=${limit}`);
         if (!response.ok) {
           throw new Error(`Lỗi HTTP: ${response.status}`);
         }
@@ -49,18 +81,32 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
         const data: ApiResponse = await response.json();
         console.log("Data fetched:", data);
         
-        // Chuyển đổi từ cấu trúc API sang cấu trúc mà component cần
-        const formattedImages: ImageData[] = data.results.map(img => ({
+        const formattedImages: AppImageData[] = data.results.map(img => ({
           id: img.id,
-          src: img.file, // Sử dụng 'file' thay vì 'src'
-          alt: img.title || "Image", // Sử dụng 'title' làm alt text
-          width: 500, // Giá trị mặc định vì API không cung cấp kích thước
-          height: 500, // Giá trị mặc định vì API không cung cấp kích thước
-          title: img.title,
-          description: img.description,
+          file: img.file,
+          src: img.file, // Đảm bảo tương thích ngược
+          alt: img.title || "Image", 
+          width: 500,  // Giá trị mặc định, API có thể không trả về
+          height: 500, // Giá trị mặc định, API có thể không trả về
+          title: img.title || "",
+          description: img.description || "",
+          username: img.username || "",
+          // Đảm bảo có thông tin tác giả đầy đủ
+          author: img.author || {
+            user_id: 0,
+            username: img.username || "user",
+            name: img.title ? `Author of ${img.title}` : "Unknown",
+            avatar: null
+          },
           created_at: img.created_at,
-          likes: img.likes,
-          downloads: img.downloads
+          time_since: img.time_since || "Recently",
+          likes: img.likes || 0,
+          downloads: img.downloads || 0,
+          likes_count: img.likes_count || img.likes || 0,
+          downloads_count: img.downloads_count || img.downloads || 0,
+          categories: img.categories || [],
+          is_liked: img.is_liked || false,
+          is_public: img.is_public
         }));
         
         console.log("Formatted images:", formattedImages);
@@ -80,3 +126,4 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
 };
 
 export default useFetchImages;
+export type { AppImageData as ImageData, Author, Category };

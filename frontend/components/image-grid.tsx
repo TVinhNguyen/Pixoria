@@ -1,27 +1,16 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import useFetchImages from "../hooks/use-FetchImages"
+import useFetchImages, { ImageData, Author } from "../hooks/use-FetchImages"
 import { handleLike, handleDownload } from "@/lib/api-action/image-actions"
 import Image from "next/image"
+import Link from "next/link"
 import Masonry from "react-masonry-css"
 import { Download, Heart, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner";
-
-interface ImageData {
-  id: number
-  src: string
-  alt: string
-  width: number
-  height: number
-  title?: string
-  description?: string
-  created_at?: string
-  likes?: number
-  downloads?: number
-}
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface ImageGridProps {
   imagesPerPage: number
@@ -29,52 +18,43 @@ interface ImageGridProps {
 }
 
 export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridProps) {
-  // Trang hiện tại (dùng cho fetch API phân trang)
+  // State không thay đổi
   const [currentPage, setCurrentPage] = useState(1)
-  // Mảng ảnh thực tế đang hiển thị
   const [displayedImages, setDisplayedImages] = useState<ImageData[]>([])
-  // Kiểm soát còn dữ liệu để load tiếp không
   const [hasMore, setHasMore] = useState(true)
-  // Quan sát phần tử cuối cùng để kích hoạt load thêm
+  const [isUsingSearchResults, setIsUsingSearchResults] = useState(false)
   const observer = useRef<IntersectionObserver | null>(null)
 
-  // Đánh dấu đang dùng kết quả tìm kiếm (nếu có)
-  const [isUsingSearchResults, setIsUsingSearchResults] = useState(false)
-
-  // Hook fetch ảnh (chỉ fetch khi không có searchResults)
+  // Hook fetch ảnh
   const { images: fetchedImages, totalPages, isLoading } = useFetchImages(
     !searchResults || searchResults.length === 0 ? currentPage : 1,
     imagesPerPage
   )
 
-  // Xử lý khi searchResults thay đổi
+  // useEffect cho kết quả tìm kiếm
   useEffect(() => {
     if (searchResults && searchResults.length > 0) {
-      // Nếu có kết quả tìm kiếm, hiển thị luôn chúng
       setDisplayedImages(searchResults)
       setIsUsingSearchResults(true)
-      setHasMore(false) // Không dùng infinite scroll khi tìm kiếm
+      setHasMore(false)
     } else {
-      // Nếu không có searchResults, chuyển về fetch API
       setIsUsingSearchResults(false)
     }
   }, [searchResults])
 
-  // Xử lý khi fetchedImages thay đổi (chỉ áp dụng khi không dùng searchResults)
+  // useEffect cho việc fetch ảnh thông thường
   useEffect(() => {
     if (!isUsingSearchResults && !isLoading && fetchedImages.length > 0) {
-      // Thêm ảnh mới vào cuối mảng (infinite scroll)
       setDisplayedImages((prev) => {
         const existingIds = new Set(prev.map((img) => img.id))
         const newImages = fetchedImages.filter((img) => !existingIds.has(img.id))
         return [...prev, ...newImages]
       })
-      // Kiểm tra còn trang tiếp không
       setHasMore(currentPage < totalPages)
     }
   }, [fetchedImages, currentPage, totalPages, isLoading, isUsingSearchResults])
 
-  // IntersectionObserver callback để load thêm khi cuộn tới cuối
+  // Observer cho infinite scrolling
   const lastImageElementRef = useCallback(
     (node: HTMLDivElement | null) => {
       if (isLoading || isUsingSearchResults) return
@@ -91,7 +71,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
     [isLoading, hasMore, isUsingSearchResults]
   )
 
-  // Mỗi khi reset từ searchResults về “bình thường”, xoá displayedImages
+  // Reset khi chuyển chế độ
   useEffect(() => {
     if (!isUsingSearchResults) {
       setDisplayedImages([])
@@ -99,27 +79,63 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
     }
   }, [isUsingSearchResults])
 
-  // Xử lí sự kiện khi nhấn nút download, nhưng mà bị chỗ policy.
-  const handleDownload1 = async (id: string, src: string) => {
+  // Xử lý like và download
+  const handleImageLike = async (imageId: number) => {
     try {
-      const response = await fetch(src);
+      const response = await handleLike(imageId);
       
+      // Cập nhật state local nếu like thành công
+      if (response && (response.status === "success" || response.likes)) {
+        setDisplayedImages(prevImages => 
+          prevImages.map(img => 
+            img.id === imageId 
+              ? { ...img, likes: response.likes, is_liked: true } 
+              : img
+          )
+        );
+        toast.success("Đã thích ảnh!");
+      } else if (response && response.status === "already_liked") {
+        toast.info("Bạn đã thích ảnh này rồi!");
+      }
+    } catch (error) {
+      console.error("Lỗi khi thích ảnh:", error);
+      toast.error("Không thể thích ảnh. Vui lòng thử lại!");
+    }
+  };
+
+  const handleImageDownload = async (imageId: number, imageSrc: string) => {
+    try {
+      // Gọi API để cập nhật số lượt tải
+      const apiResponse = await handleDownload(imageId);
+      
+      // Tải xuống file
+      const response = await fetch(imageSrc);
       if (!response.ok) {
         throw new Error(`Lỗi tải ảnh: ${response.status}`);
       }
   
       const blob = await response.blob();
-  
       const blobUrl = window.URL.createObjectURL(blob);
   
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = `image-${id}.jpg`;
+      link.download = `image-${imageId}.jpg`;
       document.body.appendChild(link);
       link.click();
   
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
+      
+      // Cập nhật state local nếu download thành công
+      if (apiResponse && (apiResponse.status === "success" || apiResponse.downloads)) {
+        setDisplayedImages(prevImages => 
+          prevImages.map(img => 
+            img.id === imageId 
+              ? { ...img, downloads: apiResponse.downloads } 
+              : img
+          )
+        );
+      }
   
       toast.success("Tải xuống thành công!");
     } catch (error) {
@@ -155,49 +171,111 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
             columnClassName="bg-clip-padding px-2"
           >
             {displayedImages.map((image, index) => {
-              const isLastElement = index === displayedImages.length - 1
+              const isLastElement = index === displayedImages.length - 1;
+              
+              // Lấy đường dẫn ảnh, ưu tiên file (API mới) rồi đến src (tương thích cũ)
+              const imageSrc = image.file || image.src || "";
+              
+              // Đảm bảo luôn có dữ liệu tác giả, nếu không có thì dùng dữ liệu mặc định
+              const author = image.author || {
+                user_id: 0,
+                username: image.username || "photographer",
+                name: "Photographer",
+                avatar: null
+              };
+              
+              // Tạo chữ cái đầu cho avatar fallback
+              const avatarInitial = author.name ? author.name.charAt(0).toUpperCase() : "P";
+              
               return (
                 <div
                   key={`${image.id}-${index}`}
                   className="mb-4 group relative overflow-hidden"
-                  // Gán ref để infinite scroll nếu là item cuối
                   ref={!isUsingSearchResults && isLastElement ? lastImageElementRef : undefined}
                 >
                   <div className="aspect-auto rounded-lg overflow-hidden">
                     <Image
-                      src={image.src}
+                      src={imageSrc}
                       width={500}
                       height={500}
                       alt={image.alt || image.title || "Image"}
-                      className="rounded-lg shadow-md transition-shadow duration-300 w-full h-auto object-cover"
+                      className="rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 w-full h-auto object-cover"
                       loading="lazy"
                       onError={(e) => {
-                        console.error("Image loading failed:", image.src)
-                        ;(e.target as HTMLImageElement).src = "/placeholder.svg"
+                        console.error("Image loading failed:", imageSrc);
+                        (e.target as HTMLImageElement).src = "/placeholder.svg";
                       }}
                     />
                   </div>
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center overflow-hidden">
-                    <div className="flex space-x-2">
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleDownload(image.id)}>
+                  
+                  {/* Overlay với gradient và hiệu ứng mượt mà */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-lg flex flex-col justify-between p-4">
+                    {/* Phần trên - các nút tương tác */}
+                    <div className="self-end flex space-x-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-150">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm" 
+                        onClick={() => handleImageDownload(image.id, imageSrc)}
+                      >
                         <Download className="h-5 w-5" />
+                        {image.downloads > 0 && (
+                          <span className="absolute -bottom-1 -right-1 bg-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                            {image.downloads > 99 ? "99+" : image.downloads}
+                          </span>
+                        )}
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200" onClick={() => handleLike(image.id)}>
-                        <Heart className="h-5 w-5" />
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm" 
+                        onClick={() => handleImageLike(image.id)}
+                      >
+                        <Heart className={`h-5 w-5 ${image.is_liked ? "fill-red-500 text-red-500" : ""}`} />
+                        {image.likes > 0 && (
+                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                            {image.likes > 99 ? "99+" : image.likes}
+                          </span>
+                        )}
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
+                        onClick={() => {
+                          // Copy URL ảnh
+                          navigator.clipboard.writeText(window.location.origin + imageSrc)
+                            .then(() => toast.success("Đã sao chép đường dẫn ảnh!"))
+                            .catch(() => toast.error("Không thể sao chép đường dẫn!"));
+                        }}
+                      >
                         <Share2 className="h-5 w-5" />
                       </Button>
                     </div>
+                    
+                    {/* Phần dưới - thông tin tác giả */}
+                    <Link 
+                      href={`/profile/${author.username}`}
+                      className="flex items-center space-x-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-150 hover:bg-black/20 p-2 rounded-lg backdrop-blur-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-white/50">
+                        <AvatarImage 
+                          src={author.avatar || "/default-avatar.png"} 
+                          alt={author.name} 
+                        />
+                        <AvatarFallback className="bg-purple-600 text-white text-xs">
+                          {avatarInitial}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="text-white">
+                        <h4 className="text-sm font-medium leading-none">{author.name}</h4>
+                        {author.username && (
+                          <p className="text-xs text-gray-300">@{author.username}</p>
+                        )}
+                      </div>
+                    </Link>
                   </div>
-                  {image.title && (
-                    <div className="mt-2">
-                      <h3 className="text-sm font-medium">{image.title}</h3>
-                      {image.description && (
-                        <p className="text-xs text-gray-500">{image.description}</p>
-                      )}
-                    </div>
-                  )}
                 </div>
               )
             })}
@@ -211,7 +289,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
           </div>
         )}
 
-        {/* Loading spinner cho infinite scroll (khi đang load thêm) */}
+        {/* Loading spinner cho infinite scroll */}
         {isLoading && !isUsingSearchResults && displayedImages.length > 0 && (
           <div className="flex justify-center my-8">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
