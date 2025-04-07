@@ -160,6 +160,7 @@ class Collection(models.Model):
     images = models.ManyToManyField(Image, related_name='collections', blank=True)
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    cover_image = models.URLField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} ({'Public' if self.is_public else 'Private'})"

@@ -1,0 +1,63 @@
+import { list } from "postcss"
+import API_BASE_URL from "../api-config"
+
+export async function handleGetCollections() {
+    const response = await fetch(`${API_BASE_URL}/collections`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    if (!response.ok) {
+        throw new Error("Failed to fetch collections")
+    }
+    return await response.json()
+}
+
+export async function handleCreateCollection(name: string, description: string, is_public: boolean, cover_image: string) {
+    const formData = new FormData()
+    formData.append("name", name)
+    formData.append("description", description)
+    formData.append("is_public", String(is_public))
+    formData.append("cover_image", cover_image)
+
+    const response = await fetch(`${API_BASE_URL}/collections/`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: formData,
+    })
+    if (!response.ok) {
+        throw new Error("Failed to create collection")
+    }
+    return await response.json()
+}
+
+export async function handleSaveImageToCollection(collectionId: string, imageId: number[]) {
+    const getRes = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    if (!getRes.ok) {
+        throw new Error("Failed to fetch existing collection")
+    }
+    const collection = await getRes.json()
+    const currentImageIds = collection.images || []
+    const combinedImageIds = Array.from(new Set([...currentImageIds, ...imageId]))
+    const patchRes = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+          images: combinedImageIds,
+        }),
+    })
+    if (!patchRes.ok) {
+        throw new Error("Failed to update collection")
+    }
+    return await patchRes.json()
+}

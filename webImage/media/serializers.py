@@ -187,7 +187,7 @@ class CollectionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Collection
-        fields = ['id', 'user', 'name', 'description', 'images', 'is_public', 'created_at']
+        fields = ['id', 'user', 'name', 'description', 'images', 'is_public', 'created_at', 'cover_image']
         read_only_fields = ['id', 'user', 'created_at']
     
     def validate_images(self, value):

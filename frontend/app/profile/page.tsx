@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
+import { useSearchParams, useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,17 +12,25 @@ import {
   loadAllLikedImages,
   loadAllDownloadedImages,
 } from "@/lib/api-action/api-profile"
+import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 
 export default function Profile() {
+  const router = useRouter()
+  const tabParams = useSearchParams()
+  const defaultTab = tabParams.get("tab") || "photos"
+  const [tab, setTab] = useState(defaultTab)
+
   const [profileData, setProfileData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [userImages, setUserImages] = useState<any[]>([])
-  const [savedImages, setSavedImages] = useState<any[]>([])
+  const [collections, setCollections] = useState<any[]>([])
+  const [collectionsLoading, setCollectionsLoading] = useState(false)
+  const [likedImages, setLikedImages] = useState<any[]>([])
   const [downloadedImages, setDownloadedImages] = useState<any[]>([])
   const [imagesLoading, setImagesLoading] = useState(false)
-  const [savedImagesLoading, setSavedImagesLoading] = useState(false)
+  const [likedImagesLoading, setLikedImagesLoading] = useState(false)
   const [downloadedImagesLoading, setDownloadedImagesLoading] = useState(false)
 
   const fetchProfile = async () => {
@@ -49,16 +58,31 @@ export default function Profile() {
     }
   }
 
+  const fetchCollections = async () => {
+    try {
+      setCollectionsLoading(true)
+      const data = await handleGetCollections()
+      console.log("User collections data:", data.results)
+      setCollections(data.results)
+      console.log("Collections:", collections)
+      console.log("Collections length:", collections.length)
+    } catch (error) {
+      console.error("Error fetching user collections:", error)
+    } finally {
+      setCollectionsLoading(false)
+    }
+  }
+
   const fetchUserLikedImages = async () => {
     try {
-      setSavedImagesLoading(true)
+      setLikedImagesLoading(true)
       const data = await loadAllLikedImages()
       console.log("User liked images data:", data)
-      setSavedImages(data)
+      setLikedImages(data)
     } catch (error) {
       console.error("Error fetching user liked images:", error)
     } finally {
-      setSavedImagesLoading(false)
+      setLikedImagesLoading(false)
     }
   }
 
@@ -76,8 +100,15 @@ export default function Profile() {
   }
 
   useEffect(() => {
+    setTab(defaultTab)
+  }, [defaultTab])
+
+  useEffect(() => {
     fetchProfile()
     fetchUserImages()
+    fetchCollections()
+    fetchUserLikedImages()
+    fetchUserDownloadedImages()
   }, [])
 
   useEffect(() => {
@@ -97,10 +128,12 @@ export default function Profile() {
   const handleTabChange = (value: string) => {
     if (value === "photos") {
       fetchUserImages()
-    } else if (value === "saved") {
+    } else if (value === "likes") {
       fetchUserLikedImages()
     } else if (value === "downloads") {
       fetchUserDownloadedImages()
+    } else if (value === "collections") {
+      fetchCollections()
     }
   }
 
@@ -177,7 +210,11 @@ export default function Profile() {
           </div>
         </div>
 
-        <Tabs defaultValue="photos" className="w-full" onValueChange={handleTabChange}>
+        <Tabs value={tab} className="w-full" onValueChange={(value) => {
+          setTab(value)
+          router.push(`/profile?tab=${value}`)
+          handleTabChange(value)
+        }}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="photos">
               <ImageIcon className="mr-2 h-4 w-4" />
@@ -187,9 +224,9 @@ export default function Profile() {
               <Grid className="mr-2 h-4 w-4" />
               Collections
             </TabsTrigger>
-            <TabsTrigger value="saved">
+            <TabsTrigger value="likes">
               <Bookmark className="mr-2 h-4 w-4" />
-              Saved
+              Likes
             </TabsTrigger>
             <TabsTrigger value="downloads">
               <Download className="mr-2 h-4 w-4" />
@@ -239,34 +276,45 @@ export default function Profile() {
           </TabsContent>
 
           <TabsContent value="collections" className="mt-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="group relative aspect-video overflow-hidden rounded-lg">
-                  <Image
-                    src={`/placeholder.svg?height=300&width=500`}
-                    alt={`Collection ${i + 1}`}
-                    width={500}
-                    height={300}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
-                  <div className="absolute bottom-0 left-0 right-0 p-4">
-                    <h3 className="text-lg font-bold text-white">Collection {i + 1}</h3>
-                    <p className="text-sm text-gray-300">{12 + i} photos</p>
-                  </div>
+            { collectionsLoading ? (
+              <div className="flex justify-center items-center h-40">
+                <div className="animate-pulse text-primary">Loading collections...</div>
+              </div>
+              ) : collections.length === 0 ? (
+                <div className="flex justify-center items-center h-40">
+                  <div className="animate-pulse text-primary">No collections yet</div>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                  {collections.map((collection) => (
+                    <div key={collection.id} className="group relative aspect-video overflow-hidden rounded-lg">
+                      <Image
+                        src={collection.cover_image || `/placeholder.svg?height=300&width=500`}
+                        alt={collection.name}
+                        width={500}
+                        height={300}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="text-lg font-bold text-white">{collection.name}</h3>
+                        <p className="text-sm text-gray-300">{collection.images.length} photos</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            }
           </TabsContent>
 
-          <TabsContent value="saved" className="mt-6">
-            {savedImagesLoading ? (
+          <TabsContent value="likes" className="mt-6">
+            {likedImagesLoading ? (
               <div className="flex justify-center items-center h-40">
-                <div className="animate-pulse text-primary">Loading saved images...</div>
+                <div className="animate-pulse text-primary">Loading liked images...</div>
               </div>
-            ) : savedImages.length > 0 ? (
+            ) : likedImages.length > 0 ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                {savedImages.map((image, i) => (
+                {likedImages.map((image, i) => (
                   <div key={image.id} className="group relative aspect-[4/3] overflow-hidden rounded-lg">
                     <Image
                       src={image.file || `/placeholder.svg?height=300&width=400`}
@@ -291,9 +339,9 @@ export default function Profile() {
               </div>
             ) : (
               <div className="text-center py-10">
-                <p className="text-muted-foreground">No saved photos yet</p>
+                <p className="text-muted-foreground">No liked photos yet</p>
                 <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                  Browse Photos to Save
+                  Browse Photos to Like
                 </Button>
               </div>
             )}

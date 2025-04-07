@@ -104,7 +104,10 @@ class CollectionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user_profile = self.request.user.userprofile
-        return Collection.objects.filter(Q(is_public=True) | Q(user=user_profile))
+        # Khúc chỗ ni là chỉ hiển thị collection với điều kiện là public hoặc của user hiện tại
+        # return Collection.objects.filter(Q(is_public=True) | Q(user=user_profile))
+        # Dòng return này là return tất cả các collection của user hiện tại, cho dù là public hay private
+        return Collection.objects.filter(user=user_profile)
 
     def check_object_permissions(self, request, obj):
         if obj.user != request.user.userprofile:
