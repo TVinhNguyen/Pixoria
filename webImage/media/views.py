@@ -171,24 +171,9 @@ class ImageViewSet(viewsets.ModelViewSet):
     @action(detail=False, permission_classes=[AllowAny], url_path='user/(?P<username>[^/.]+)')
     def user_images(self, request, username=None):
         """API để lấy tất cả ảnh của một user theo username"""
-        # Cải thiện truy vấn với get_object_or_404 để trả về lỗi 404 rõ ràng
         user = get_object_or_404(UserProfile, user__username=username)
-        
-        # Cải thiện bảo mật: chỉ hiển thị ảnh public nếu không phải là chủ sở hữu
-        if request.user.is_authenticated and request.user.username == username:
-            images = Image.objects.filter(user=user)
-        else:
-            images = Image.objects.filter(user=user, is_public=True)
-        
-        # Tối ưu truy vấn với select_related
-        images = images.select_related('user', 'user__user')
-        
-        # Phân trang nếu cần
-        page = self.paginate_queryset(images)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-            
+        images = Image.objects.filter(user=user)
+
         serializer = self.get_serializer(images, many=True)
         return Response(serializer.data)
 
@@ -708,7 +693,8 @@ class LikedImageViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Lấy danh sách các ảnh mà user đã like, không trả về thông tin LikedImage"""
-        liked_images = LikedImage.objects.values_list('image', flat=True)
+        user_profile = request.user.userprofile
+        liked_images = LikedImage.objects.filter(user=user_profile).values_list('image', flat=True)
         images = Image.objects.filter(id__in=liked_images)
         serializer = ImageSerializer(images, many=True)
         return Response(serializer.data)
@@ -724,7 +710,8 @@ class DownloadedImageViewSet(viewsets.ModelViewSet):
     
     def list(self, request, *args, **kwargs):
         """Lấy danh sách các ảnh mà user đã tải về"""
-        downloaded_images = DownloadedImage.objects.values_list('image', flat=True)
+        user_profile = request.user.userprofile
+        downloaded_images = DownloadedImage.objects.filter(user=user_profile).values_list('image', flat=True)
         images = Image.objects.filter(id__in=downloaded_images)
         serializer = ImageSerializer(images, many=True)
         return Response(serializer.data)
