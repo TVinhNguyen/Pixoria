@@ -14,6 +14,7 @@ import {
 } from "@/lib/api-action/api-profile"
 import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
+import EditCollectionModal from "@/components/modal/collections/edit-collection-modal"
 
 export default function Profile() {
   const router = useRouter()
@@ -32,6 +33,9 @@ export default function Profile() {
   const [imagesLoading, setImagesLoading] = useState(false)
   const [likedImagesLoading, setLikedImagesLoading] = useState(false)
   const [downloadedImagesLoading, setDownloadedImagesLoading] = useState(false)
+
+  const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
+  const [isEditCollectionModalOpen, setIsEditCollectionModalOpen] = useState(false)
 
   const fetchProfile = async () => {
     try {
@@ -300,6 +304,13 @@ export default function Profile() {
                         <h3 className="text-lg font-bold text-white">{collection.name}</h3>
                         <p className="text-sm text-gray-300">{collection.images.length} photos</p>
                       </div>
+                      <Button onClick={() => {
+                          setSelectedCollectionId(collection.id)
+                          setIsEditCollectionModalOpen(true)
+                        }} variant="ghost" size="sm" className="absolute right-2 top-2 bg-black/30 hover:bg-black/50 text-white">
+                        <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -410,6 +421,14 @@ export default function Profile() {
             photos: profileData.photos || 0,
             social_link: profileData.social_link || "",
           }}
+        />
+      )}
+      
+      { isEditCollectionModalOpen && selectedCollectionId != null && (
+        <EditCollectionModal
+          isOpen={isEditCollectionModalOpen}
+          onClose={() => setIsEditCollectionModalOpen(false)}
+          collectionId = {selectedCollectionId}
         />
       )}
     </div>

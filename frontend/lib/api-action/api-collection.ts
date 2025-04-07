@@ -1,4 +1,3 @@
-import { list } from "postcss"
 import API_BASE_URL from "../api-config"
 
 export async function handleGetCollections() {
@@ -60,4 +59,36 @@ export async function handleSaveImageToCollection(collectionId: string, imageId:
         throw new Error("Failed to update collection")
     }
     return await patchRes.json()
+}
+
+export async function handleGetCollectionById(collectionId: string) {
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    if (!response.ok) {
+        throw new Error("Failed to fetch collections")
+    }
+    return await response.json()
+}
+
+export async function handleUpdateCollection(collectionId: string, name: string, description: string, is_public: boolean) {
+    const formData = new FormData()
+    formData.append("name", name)
+    formData.append("description", description)
+    formData.append("is_public", String(is_public))
+
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+        method: "PATCH",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: formData,
+    })
+    if (!response.ok) {
+        throw new Error("Failed to update collection")
+    }
+    return await response.json()
 }
