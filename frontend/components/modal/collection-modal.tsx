@@ -169,7 +169,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
                       {/* Create new collection */}
                       <button
                         onClick={handleCreateNewCollection}
-                        className="flex flex-col items-center justify-center p-4 border border-dashed border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="flex flex-col items-center justify-center p-4 border border-dashed border-gray-300 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                       >
                         <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
                           <Plus className="h-10 w-10 text-gray-400" />
@@ -183,7 +183,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
                           <button
                             key={collection.id}
                             onClick={() => handleSaveToCollection(collection.id)}
-                            className="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="flex flex-col items-center justify-center p-4 border border-gray-300 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                           >
                             <div className="w-24 h-24 bg-gray-100 rounded-lg overflow-hidden mb-2">
                               {collection.cover_image ? (
