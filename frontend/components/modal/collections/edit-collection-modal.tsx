@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader} from "@/components/ui/dialog"
 import { handleGetCollectionById, handleUpdateCollection } from "@/lib/api-action/api-collection"
 import { DialogTitle } from "@radix-ui/react-dialog"
+import ToastNotification from "../message-modal"
 
 interface Collection {
   id: number
@@ -27,15 +28,25 @@ interface CollectionModalProps {
 export default function EditCollectionModal({ isOpen, onClose, collectionId }: CollectionModalProps) {
     const [collectionData, setCollectionData] = useState<Collection | null>(null)
     const [isLoading, setIsLoading] = useState(true)
+    // chỗ này được dùng để set mấy cái toast
+    const [toastOpen, setToastOpen] = useState(false)
+    const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+    const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+
     const [updatedCollection, setUpdatedCollection] = useState<{
         name: string
         description: string
         is_public: boolean
-    }>({
-        name: "",
-        description: "",
-        is_public: true,
-    })
+    }>({ name: "", description: "", is_public: true})
+
+    const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+        setToastVariant(variant)
+        setToastMessage({ title, description, duration })
+        setToastOpen(true)
+        setTimeout(() => {
+            onClose()
+        }, duration - 3000)
+    }
 
     const fetchCollectionData = async () => {
         try {
@@ -45,7 +56,7 @@ export default function EditCollectionModal({ isOpen, onClose, collectionId }: C
             setUpdatedCollection({
                 name: data.name,
                 description: data.description || "",
-                is_public: data.is_public || true,
+                is_public: data.is_public,
             })
             console.log("Collection data fetched:", data)
         } catch (error) {
@@ -63,16 +74,13 @@ export default function EditCollectionModal({ isOpen, onClose, collectionId }: C
 
     const handleSaveChanges = async () => {
         try {
-            await handleUpdateCollection(
-                collectionId.toString(),
-                updatedCollection.name,
-                updatedCollection.description,
-                updatedCollection.is_public
-            )
-            console.log("Collection updated successfully")
-            onClose()
+            const response = await handleUpdateCollection(collectionId.toString(), updatedCollection.name, updatedCollection.description, updatedCollection.is_public)
+            if (response != null)
+                setNotification("success", "Success", "Collection updated successfully!", 5000)
+            else 
+                setNotification("error", "Error", "Failed to update collection.", 5000)
         } catch (error) {
-            console.error("Error updating collection:", error)
+            setNotification("error", "Error", "Failed to update collection.", 5000)
         }
     }
 
@@ -124,7 +132,14 @@ export default function EditCollectionModal({ isOpen, onClose, collectionId }: C
                     </div>
                 </div>
             </DialogContent>
+            <ToastNotification
+                variant={toastVariant}
+                title={toastMessage.title}
+                description={toastMessage.description}
+                isOpen={toastOpen}
+                onClose={() => setToastOpen(false)}
+                duration={toastMessage.duration}
+            />
         </Dialog>
     )
 }
-

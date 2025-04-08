@@ -15,6 +15,7 @@ import {
 import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 import EditCollectionModal from "@/components/modal/collections/edit-collection-modal"
+import CollectionImagesModal from "@/components/modal/collections/collection-images-modal"
 
 export default function Profile() {
   const router = useRouter()
@@ -36,6 +37,7 @@ export default function Profile() {
 
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [isEditCollectionModalOpen, setIsEditCollectionModalOpen] = useState(false)
+  const [isCollectionImagesOpen, setIsCollectionImagesOpen] = useState(false)
 
   const fetchProfile = async () => {
     try {
@@ -53,7 +55,6 @@ export default function Profile() {
     try {
       setImagesLoading(true)
       const data = await loadAllUploadedImages()
-      console.log("User images data:", data)
       setUserImages(data)
     } catch (error) {
       console.error("Error fetching user images:", error)
@@ -64,12 +65,8 @@ export default function Profile() {
 
   const fetchCollections = async () => {
     try {
-      setCollectionsLoading(true)
       const data = await handleGetCollections()
-      console.log("User collections data:", data.results)
       setCollections(data.results)
-      console.log("Collections:", collections)
-      console.log("Collections length:", collections.length)
     } catch (error) {
       console.error("Error fetching user collections:", error)
     } finally {
@@ -81,7 +78,6 @@ export default function Profile() {
     try {
       setLikedImagesLoading(true)
       const data = await loadAllLikedImages()
-      console.log("User liked images data:", data)
       setLikedImages(data)
     } catch (error) {
       console.error("Error fetching user liked images:", error)
@@ -94,7 +90,6 @@ export default function Profile() {
     try {
       setDownloadedImagesLoading(true)
       const data = await loadAllDownloadedImages()
-      console.log("User downloaded images data:", data)
       setDownloadedImages(data)
     } catch (error) {
       console.error("Error fetching user downloaded images:", error)
@@ -120,6 +115,13 @@ export default function Profile() {
       fetchProfile()
     }
   }, [isEditModalOpen])
+
+  useEffect(() => {
+    if (!isEditCollectionModalOpen) {
+      fetchCollections()
+    }
+  }, [isEditCollectionModalOpen])
+
 
   if (loading) {
     return (
@@ -291,7 +293,10 @@ export default function Profile() {
               ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
                   {collections.map((collection) => (
-                    <div key={collection.id} className="group relative aspect-video overflow-hidden rounded-lg">
+                    <div key={collection.id} className="group relative aspect-video overflow-hidden rounded-lg" onClick={() => {
+                      setIsCollectionImagesOpen(true)
+                      setSelectedCollectionId(collection.id)
+                    }}>
                       <Image
                         src={collection.cover_image || `/placeholder.svg?height=300&width=500`}
                         alt={collection.name}
@@ -304,7 +309,8 @@ export default function Profile() {
                         <h3 className="text-lg font-bold text-white">{collection.name}</h3>
                         <p className="text-sm text-gray-300">{collection.images.length} photos</p>
                       </div>
-                      <Button onClick={() => {
+                      <Button onClick={(e) => {
+                          e.stopPropagation()
                           setSelectedCollectionId(collection.id)
                           setIsEditCollectionModalOpen(true)
                         }} variant="ghost" size="sm" className="absolute right-2 top-2 bg-black/30 hover:bg-black/50 text-white">
@@ -429,6 +435,14 @@ export default function Profile() {
           isOpen={isEditCollectionModalOpen}
           onClose={() => setIsEditCollectionModalOpen(false)}
           collectionId = {selectedCollectionId}
+        />
+      )}
+
+      { isCollectionImagesOpen && selectedCollectionId != null && (
+        <CollectionImagesModal
+          isOpen={isCollectionImagesOpen}
+          onClose={() => setIsCollectionImagesOpen(false)}
+          collectionId={selectedCollectionId}
         />
       )}
     </div>

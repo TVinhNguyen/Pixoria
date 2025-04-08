@@ -37,47 +37,47 @@ export default function Hero() {
     {
       id: 1,
       src: "images/nature.jpg",
-      alt: "Cảnh thiên nhiên tuyệt đẹp",
+      alt: "Beautiful natural scenery",
       width: 1920,
       height: 1080,
-      title: "Khám phá thiên nhiên tuyệt đẹp",
-      description: "Tìm kiếm hình ảnh phong cảnh với góc nhìn độc đáo và màu sắc rực rỡ."
+      title: "Explore the beauty of nature",
+      description: "Looking for landscape images with unique perspectives and vibrant colors."
     },
     {
       id: 2,
       src: "images/workspace.jpg",
-      alt: "Không gian làm việc sáng tạo",
+      alt: "Creative workspace",
       width: 1920,
       height: 1080,
-      title: "Không gian làm việc sáng tạo",
-      description: "Những bức ảnh về không gian làm việc hiện đại và sáng tạo giúp truyền cảm hứng."
+      title: "Creative workspace",
+      description: "Photos of modern and creative workspaces to inspire."
     },
     {
       id: 3,
       src: "images/city.jpg",
-      alt: "Đô thị hiện đại",
+      alt: "Modern cityscape",
       width: 1920,
       height: 1080,
-      title: "Khám phá đô thị hiện đại",
-      description: "Những góc nhìn độc đáo về cuộc sống đô thị và kiến trúc hiện đại."
+      title: "Explore modern cityscapes",
+      description: "Unique perspectives on urban life and modern architecture."
     },
     {
       id: 4,
       src: "images/portrait.jpg",
-      alt: "Chân dung nghệ thuật",
+      alt: "Artistic portrait",
       width: 1920,
       height: 1080,
-      title: "Chân dung nghệ thuật",
-      description: "Bộ sưu tập ảnh chân dung ấn tượng với cách tiếp cận sáng tạo và đầy cảm xúc."
+      title: "Artistic portrait photography",
+      description: "Impressive portrait collection with creative and emotional approach."
     },
     {
       id: 5,
       src: "images/food.jpg",
-      alt: "Ẩm thực sáng tạo",
+      alt: "Creative cuisine",
       width: 1920,
       height: 1080,
-      title: "Khám phá ẩm thực sáng tạo",
-      description: "Những hình ảnh ẩm thực đẹp mắt và hấp dẫn từ khắp nơi trên thế giới."
+      title: "Explore creative cuisine",
+      description: "Beautiful and attractive food pictures from around the world."
     }
   ])
   const handleSearch = async (e: React.FormEvent) => {
@@ -299,7 +299,6 @@ export default function Hero() {
 
       {!hasSearched && (
         <div className="container mx-auto py-8 px-4">
-          <h2 className="text-2xl font-bold mb-6">Bộ sưu tập nổi bật</h2>
           <SliderGallery images={featuredImages} />
         </div>
       )}

@@ -10,8 +10,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { handleCreateCollection, handleGetCollections, handleSaveImageToCollection } from "@/lib/api-action/api-collection"
-import ToastNotification from "./message-modal"
+import { toast } from "sonner"
+import {
+  handleCreateCollection,
+  handleGetCollections,
+  handleSaveImageToCollection,
+} from "@/lib/api-action/api-collection"
 
 interface Collection {
   id: number
@@ -33,31 +37,26 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
   const [userCollections, setUserCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
-  // chỗ này được dùng để set mấy cái toast
-  const [toastOpen, setToastOpen] = useState(false)
-  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
-  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
-
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newCollection, setNewCollection] = useState<{
     name: string
     description: string
     is_public: boolean
-  }>({ name: "", description: "", is_public: true })
-
-  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
-    setToastVariant(variant)
-    setToastMessage({ title, description, duration })
-    setToastOpen(true)
-}
+  }>({
+    name: "",
+    description: "",
+    is_public: true,
+  })
 
   const fetchCollections = async () => {
     try {
       setLoading(true)
       const collections = await handleGetCollections()
+      console.log("Fetched collections:", collections)
       setUserCollections(collections.results)
     } catch (error) {
       console.error("Error fetching collections:", error)
+      toast.error("Failed to fetch collections")
     } finally {
       setLoading(false)
     }
@@ -65,6 +64,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
 
   useEffect(() => {
     if (isOpen) {
+      console.log("Fetching collections...")
       fetchCollections()
     }
   }, [isOpen])
@@ -75,43 +75,52 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
 
   const handleSaveNewCollection = async () => {
     if (!newCollection.name.trim()) {
-      setNotification("error", "Error!", "Collection name is required.", 3000)
+      toast.error("Please enter a collection name")
       return
     }
+
     try {
-      const createdCollection = await handleCreateCollection(newCollection.name, newCollection.description, newCollection.is_public, imageUrl || "")
-      if (createdCollection != null) {
-        setNotification("success", "Success!", "Collection created successfully.", 3000)
-      }
+      console.log("Creating new collection with image:", imageUrl)
+      const createdCollection = await handleCreateCollection(
+        newCollection.name,
+        newCollection.description,
+        newCollection.is_public,
+        imageUrl || "",
+      )
+
       const newCollectionWithCover = {
         ...createdCollection,
         cover_image: imageUrl || createdCollection.cover_image,
       }
+
       setUserCollections([...userCollections, newCollectionWithCover])
-      setNewCollection({ name: "", description: "", is_public: true })
+      setNewCollection({
+        name: "",
+        description: "",
+        is_public: true,
+      })
       setShowCreateForm(false)
       handleSaveToCollection(createdCollection.id)
-      setTimeout(() => {
-        onClose()
-      }, toastMessage.duration - 2000)
+      onClose()
     } catch (error) {
       console.error("Error creating collection:", error)
+      toast.error("Failed to create collection")
     }
   }
 
   const handleSaveToCollection = async (collectionId: number) => {
     const imageIds = [imageId]
     const response = await handleSaveImageToCollection(collectionId.toString(), imageIds)
-    if (response != null) {
-      setNotification("success", "Success!", "Image saved to collection successfully.", 3000)
-    } else {
-      setNotification("error", "Error!", "Failed to save image to collection.", 3000)
-    }
+    console.log("Image saved to collection:", response)
   }
 
   const handleCancelCreate = () => {
     setShowCreateForm(false)
-    setNewCollection({ name: "", description: "", is_public: true })
+    setNewCollection({
+      name: "",
+      description: "",
+      is_public: true,
+    })
   }
 
   return (
@@ -212,6 +221,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
                 variant="outline"
                 className="w-full justify-between"
                 onClick={() => {
+                  toast.success("Redirecting to collections page")
                   onClose()
                   router.push("/profile?tab=collections")
                 }}
@@ -290,14 +300,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
           </div>
         )}
       </DialogContent>
-      <ToastNotification
-        variant={toastVariant}
-        title={toastMessage.title}
-        description={toastMessage.description}
-        isOpen={toastOpen}
-        onClose={() => setToastOpen(false)}
-        duration={toastMessage.duration}
-      />
     </Dialog>
   )
 }
+
