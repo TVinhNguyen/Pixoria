@@ -176,62 +176,54 @@ export async function searchByImageUrl(imageUrl: string): Promise<VisualSearchRe
 
 export async function searchByText(query: string): Promise<VisualSearchResult[]> {
   try {
-    // Lấy token xác thực từ localStorage nếu có
     const token = localStorage.getItem("token");
-    
-    // Chuẩn bị headers
+
     const headers: HeadersInit = {
       "Content-Type": "application/json",
     };
-    
+
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
-    
-    // Gọi API thực tế
+
     const response = await fetch(`${API_BASE_URL}/image-search/text/`, {
       method: "POST",
       headers,
       body: JSON.stringify({
-        text_query: query,
+        query: query,
         top_k: 20,
       }),
     });
-    
-    // Kiểm tra response
+
     if (!response.ok) {
-      // Xử lý lỗi từ server
       const errorText = await response.text();
       let errorMessage = `Có lỗi xảy ra khi tìm kiếm với từ khóa "${query}"`;
-      
+
       try {
         const errorData = JSON.parse(errorText);
         errorMessage = errorData.error || errorMessage;
       } catch (e) {
         errorMessage = errorText || errorMessage;
       }
-      
+
       console.error("Text search API error:", errorText);
       throw new Error(errorMessage);
     }
-    
-    // Phân tích kết quả trả về
+
     const data = await response.json();
-    
-    // Kiểm tra nếu có kết quả trả về từ API
+
     if (data.results && data.results.length > 0) {
-      // Chuyển đổi kết quả từ API thành định dạng VisualSearchResult
       const results: VisualSearchResult[] = data.results.map((item: any) => {
-        const itemId = typeof item.id === 'number' 
-            ? item.id 
-            : item.id 
-                ? item.id.toString() 
-                : `temp-${Math.random().toString(36).substring(2, 11)}`;
-        
+        const itemId = typeof item.id === 'number'
+          ? item.id
+          : item.id
+            ? item.id.toString()
+            : `temp-${Math.random().toString(36).substring(2, 11)}`;
+
         return {
           id: itemId,
-          url: item.file, // URL của ảnh
-          src: item.file, // Thêm src để phù hợp với ImageGrid
+          url: item.file,
+          src: item.file,
           alt: item.title || `Kết quả tìm kiếm cho "${query}"`,
           title: item.title || `Kết quả cho "${query}"`,
           width: item.width || 500,
@@ -244,46 +236,14 @@ export async function searchByText(query: string): Promise<VisualSearchResult[]>
           created_at: item.created_at || null,
         };
       });
-      
+
       return results;
-    } else {
-      // API không có kết quả, sử dụng dữ liệu mẫu cho mục đích phát triển
-      console.log("No results from API, using placeholder data");
-      
-      // Sử dụng dữ liệu mẫu
-      return [
-        {
-          id: 1,
-          url: "/placeholder.svg?height=400&width=600&text=Result+1",
-          src: "/placeholder.svg?height=400&width=600&text=Result+1",
-          alt: `Result 1 for "${query}"`,
-          title: `Result 1 for "${query}"`,
-          similarity: 1.0,
-          width: 600,
-          height: 400,
-          description: `Placeholder result 1 for "${query}"`,
-          likes: 10,
-          downloads: 5
-        },
-        {
-          id: 2,
-          url: "/placeholder.svg?height=400&width=600&text=Result+2",
-          src: "/placeholder.svg?height=400&width=600&text=Result+2",
-          alt: `Result 2 for "${query}"`,
-          title: `Result 2 for "${query}"`,
-          similarity: 0.9,
-          width: 600, 
-          height: 400,
-          likes: 8,
-          downloads: 3
-        },
-        // 3 mẫu khác giữ nguyên...
-      ];
     }
+
+    // ✅ Fix thiếu return
+    return [];
   } catch (error) {
     console.error("Error in searchByText:", error);
-    
-    // Trong trường hợp lỗi, trả về mảng rỗng để tránh lỗi ứng dụng
-    return [];
+    throw error;
   }
 }
