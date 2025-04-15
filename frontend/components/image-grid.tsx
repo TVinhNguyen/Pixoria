@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import CollectionModal from "./modal/collection-modal"
+import ToastNotification from "./modal/message-modal"
+import { set } from "date-fns"
 
 interface ImageGridProps {
   imagesPerPage: number
@@ -29,6 +31,17 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
   // State cho modal bộ sưu tập
   const [collectionModalOpen, setCollectionModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null)
+
+  // chỗ này được dùng để set mấy cái toast
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+
+  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+    setToastVariant(variant)
+    setToastMessage({ title, description, duration })
+    setToastOpen(true)
+  }
 
   // Hook fetch ảnh
   const {
@@ -95,50 +108,37 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
         setDisplayedImages((prevImages) =>
           prevImages.map((img) => (img.id === imageId ? { ...img, likes: response.likes, is_liked: true } : img)),
         )
-        toast.success("Đã thích ảnh!")
       } else if (response && response.status === "already_liked") {
         toast.info("Bạn đã thích ảnh này rồi!")
       }
     } catch (error) {
       console.error("Lỗi khi thích ảnh:", error)
-      toast.error("Không thể thích ảnh. Vui lòng thử lại!")
     }
   }
 
   const handleImageDownload = async (imageId: number, imageSrc: string) => {
     try {
-      // Gọi API để cập nhật số lượt tải
       const apiResponse = await handleDownload(imageId)
-
-      // Tải xuống file
-      const response = await fetch(imageSrc)
-      if (!response.ok) {
-        throw new Error(`Lỗi tải ảnh: ${response.status}`)
-      }
-
+      const header = new Headers({ "Access-Control-Allow-Origin": "*" })
+      const response = await fetch(imageSrc, {headers: header})
       const blob = await response.blob()
       const blobUrl = window.URL.createObjectURL(blob)
-
       const link = document.createElement("a")
       link.href = blobUrl
       link.download = `image-${imageId}.jpg`
       document.body.appendChild(link)
       link.click()
-
       document.body.removeChild(link)
       window.URL.revokeObjectURL(blobUrl)
-
-      // Cập nhật state local nếu download thành công
       if (apiResponse && (apiResponse.status === "success" || apiResponse.downloads)) {
         setDisplayedImages((prevImages) =>
           prevImages.map((img) => (img.id === imageId ? { ...img, downloads: apiResponse.downloads } : img)),
         )
       }
-
-      toast.success("Tải xuống thành công!")
+      setNotification("success", "Success", "Image is downloaded successfully!", 3000)
     } catch (error) {
       console.error("Lỗi khi tải ảnh:", error)
-      toast.error("Tải xuống thất bại!")
+      setNotification("error", "Error", "Failed to download the image. Please try again!", 3000)
     }
   }
 
@@ -146,6 +146,11 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
   const handleAddToCollection = (image: ImageData) => {
     setSelectedImage(image)
     setCollectionModalOpen(true)
+  }
+
+  const handleShare = (imageSrc: string) => {
+    navigator.clipboard.writeText(window.location.origin + imageSrc)
+    setNotification("success", "Success", "Image's link is saved to clipboard!", 3000)
   }
 
   return (
@@ -254,13 +259,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
                         size="icon"
                         variant="ghost"
                         className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
-                        onClick={() => {
-                          // Copy URL ảnh
-                          navigator.clipboard
-                            .writeText(window.location.origin + imageSrc)
-                            .then(() => toast.success("Đã sao chép đường dẫn ảnh!"))
-                            .catch(() => toast.error("Không thể sao chép đường dẫn!"))
-                        }}
+                        onClick={() => handleShare(imageSrc)}
                       >
                         <Share2 className="h-5 w-5" />
                       </Button>
@@ -311,6 +310,15 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
             imageUrl={selectedImage.file || selectedImage.src}
           />
         )}
+
+        <ToastNotification
+          variant={toastVariant}
+          title={toastMessage.title}
+          description={toastMessage.description}
+          isOpen={toastOpen}
+          onClose={() => setToastOpen(false)}
+          duration={toastMessage.duration}
+        />
       </div>
     </section>
   )

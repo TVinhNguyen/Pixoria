@@ -26,9 +26,10 @@ interface CollectionModalProps {
   onClose: () => void
   imageId: number
   imageUrl?: string
+  onImageMoved?: (imageId: number) => void
 }
 
-export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: CollectionModalProps) {
+export default function CollectionModal({ isOpen, onClose, imageId, imageUrl, onImageMoved }: CollectionModalProps) {
   const router = useRouter()
   const [userCollections, setUserCollections] = useState<Collection[]>([])
   const [loading, setLoading] = useState<boolean>(true)
@@ -104,6 +105,12 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
     const response = await handleSaveImageToCollection(collectionId.toString(), imageIds)
     if (response != null) {
       setNotification("success", "Success!", "Image saved to collection successfully.", 3000)
+      if (onImageMoved) {
+        onImageMoved(imageId)
+      }
+      setTimeout(() => {
+        onClose()
+      }, toastMessage.duration - 2000)
     } else {
       setNotification("error", "Error!", "Failed to save image to collection.", 3000)
     }
@@ -119,7 +126,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
       <DialogContent className="sm:max-w-md overflow-y-auto max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl font-bold">
-            {showCreateForm ? "Create a new collection" : "Add to my collection"}
+            {showCreateForm ? "Create a new collection" : "Move into my new collection"}
           </DialogTitle>
         </DialogHeader>
 

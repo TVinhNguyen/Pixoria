@@ -8,8 +8,7 @@ import { MoveRight, Trash2 } from "lucide-react"
 import { handleGetCollectionById, handleGetCollections, loadImagesFromCollection,
          handleRemoveImageFromCollection } from "@/lib/api-action/api-collection"
 import ToastNotification from "../message-modal"
-//import CollectionModal from "./move-modal"
-import CollectionModal from "../collection-modal"
+import CollectionModal from "./move-modal"
 
 interface Collection {
   id: number
@@ -35,7 +34,6 @@ interface CollectionImagesModalProps {
 export default function CollectionImagesModal({ isOpen, onClose, collectionId }: CollectionImagesModalProps) {
   const [collection, setCollection] = useState<Collection | null>(null)
   const [loading, setLoading] = useState(true)
-  //const [otherCollections, setOtherCollections] = useState<Collection[]>([])
 
   // chỗ này được dùng để set mấy cái toast
   const [toastOpen, setToastOpen] = useState(false)
@@ -45,7 +43,6 @@ export default function CollectionImagesModal({ isOpen, onClose, collectionId }:
   // chỗ này thì được dùng để mở cái model mà chuyển tới collection mới
   const [collectionModalOpen, setCollectionModalOpen] = useState(false)
   const [selectedImage, setSelectedImage] = useState<CollectionImage | null>(null)
-  const [movedTargetCollectionId, setMovedTargetCollectionId] = useState<number | null>(null)
 
   const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
     setToastVariant(variant)
@@ -76,13 +73,6 @@ export default function CollectionImagesModal({ isOpen, onClose, collectionId }:
     }
   }, [isOpen, collectionId])
 
-  useEffect(() => {
-    if (collectionModalOpen) {
-      handleRemoveImageFromCollection(collectionId.toString(), selectedImage?.id || 0)
-      fetchCollectionData()
-    }
-  }, [collectionModalOpen])
-
   const handleRemoveImage = async (imageId: number) => {
     try {
       const response = await handleRemoveImageFromCollection(collectionId.toString(), imageId)
@@ -93,6 +83,12 @@ export default function CollectionImagesModal({ isOpen, onClose, collectionId }:
     } catch (error) {
       setNotification("error", "Error", "Failed to remove the image from the collection.", 3000)
     }
+  }
+
+  const handleImageMoved = async (imageId: number) => {
+    await handleRemoveImageFromCollection(collectionId.toString(), imageId)
+    fetchCollectionData()
+    setNotification("success", "Image moved", "Image has been moved to another collection.", 3000)
   }
 
   const handleMoveImage = async (image: CollectionImage) => {
@@ -178,6 +174,7 @@ export default function CollectionImagesModal({ isOpen, onClose, collectionId }:
           onClose={() => setCollectionModalOpen(false)}
           imageId={selectedImage.id}
           imageUrl={selectedImage.file}
+          onImageMoved={handleImageMoved}
         />
       )}
     </Dialog>

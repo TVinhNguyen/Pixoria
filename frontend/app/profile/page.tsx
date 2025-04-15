@@ -16,8 +16,14 @@ import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 import EditCollectionModal from "@/components/modal/collections/edit-collection-modal"
 import CollectionImagesModal from "@/components/modal/collections/collection-images-modal"
+import ToastNotification from "@/components/modal/message-modal"
 
 export default function Profile() {
+  // chỗ này được dùng để set mấy cái toast
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+
   const router = useRouter()
   const tabParams = useSearchParams()
   const defaultTab = tabParams.get("tab") || "photos"
@@ -38,6 +44,12 @@ export default function Profile() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [isEditCollectionModalOpen, setIsEditCollectionModalOpen] = useState(false)
   const [isCollectionImagesOpen, setIsCollectionImagesOpen] = useState(false)
+
+  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+    setToastVariant(variant)
+    setToastMessage({ title, description, duration })
+    setToastOpen(true)
+  }
 
   const fetchProfile = async () => {
     try {
@@ -148,6 +160,12 @@ export default function Profile() {
     }
   }
 
+  const handleClickShare = () => {
+    const url = window.location.origin + window.location.pathname
+    navigator.clipboard.writeText(url)
+    setNotification("success", "Success", "Sucessfully copy your profile link to clipboard.", 3000)
+  }
+
   return (
     <div className="min-h-screen pt-16">
       <div className="relative w-full h-48 md:h-64 bg-gradient-to-r from-purple-600 to-pink-600">
@@ -186,7 +204,7 @@ export default function Profile() {
                 </a>
               </Button>
             )}
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={ handleClickShare }>
               <Share2 className="h-4 w-4 mr-2" />
               Share
             </Button>
@@ -450,6 +468,15 @@ export default function Profile() {
           collectionId={selectedCollectionId}
         />
       )}
+
+      <ToastNotification
+        variant={toastVariant}
+        title={toastMessage.title}
+        description={toastMessage.description}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        duration={toastMessage.duration}
+      />
     </div>
   )
 }
