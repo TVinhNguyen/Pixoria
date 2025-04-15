@@ -7,8 +7,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import CreateAPIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
-from rest_framework.views import APIView
+
+from clip_retrieval.clip_search import CLIPImageSearch
 
 import os
 import tempfile
@@ -334,89 +334,79 @@ class ImageViewSet(viewsets.ModelViewSet):
 
 
 class ImageSearchViewSet(viewsets.ViewSet):
-    """ViewSet để tìm kiếm ảnh tương tự"""
+    """
+    ViewSet để tìm kiếm ảnh tương tự.
+    Các endpoint:
+      - GET /api/image-search/         (list): Trả về thông tin hướng dẫn.
+      - POST /api/image-search/        (create): Xử lý tìm kiếm ảnh dựa trên URL hoặc file upload.
+      - POST /api/image-search/upload/ (search_by_upload): Tìm kiếm theo file ảnh upload.
+      - POST /api/image-search/url/    (search_by_url): Tìm kiếm theo URL ảnh.
+    """
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    
+
     def list(self, request):
-        """Hiển thị form tìm kiếm (tương đương với GET request trong APIView)"""
+        """Hiển thị thông tin hướng dẫn tìm kiếm ảnh (GET request)"""
         return Response({
             'message': 'Tìm kiếm ảnh tương tự',
             'instructions': 'Sử dụng POST request để upload ảnh hoặc cung cấp URL ảnh'
         })
-    
+
     def create(self, request):
-        """Xử lý tìm kiếm ảnh (tương đương với POST request trong APIView)"""
-        # Kiểm tra dữ liệu đầu vào
+        """
+        Xử lý tìm kiếm ảnh (POST request).
+        Hỗ trợ tìm kiếm bằng cách:
+         - Sử dụng URL ảnh: key "image_url" trong request.data.
+         - Sử dụng file ảnh: key "image_file" trong request.FILES.
+         - Nếu không có ảnh thì có thể thực hiện tìm kiếm theo query text (ví dụ key "query") nếu bạn muốn.
+        """
         image_file = request.FILES.get('image_file')
         image_url = request.data.get('image_url')
-        top_k = int(request.data.get('top_k', 10))
-        
-        if not image_file and not image_url:
-            return Response({
-                "error": "Vui lòng cung cấp image_file hoặc image_url"
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
+        # Nếu muốn hỗ trợ tìm kiếm theo query text (không dùng ảnh) thì bạn có thể lấy key "query"
+        query = request.data.get('query', '')
+        top_k = int(request.data.get('top_k', 12))
+
         try:
-            # Khởi tạo ImageSearch
-            image_search = ImageSearch.get_instance()
-            
-            # Tìm kiếm với URL hoặc file
+            # Khởi tạo đối tượng tìm kiếm (có thể là singleton hoặc một instance mới)
+            search_engine = CLIPImageSearch()
+            # Nếu bạn cần load FAISS index, hãy chắc chắn gọi: search_engine.load_faiss_index("path/to/index_file")
+
+            # Ưu tiên tìm kiếm theo ảnh dựa trên URL
             if image_url:
-                search_results = image_search.search(image_url, top_k=top_k)
+                # Sử dụng search() của CLIPImageSearch – phiên bản dùng URL để tải ảnh và xử lý embedding
+                results = search_engine.search(image_url, top_k=top_k)
             elif image_file:
-                # Lưu file tạm thời
+                # Lưu file ảnh tạm thời để xử lý
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
                     for chunk in image_file.chunks():
                         tmp.write(chunk)
                     tmp_path = tmp.name
-                    
+
                 try:
-                    search_results = image_search.search(tmp_path, top_k=top_k)
+                    results = search_engine.search_by_image(tmp_path, top_k=top_k)
                 finally:
-                    # Xóa file tạm
                     if os.path.exists(tmp_path):
                         os.unlink(tmp_path)
-            
-            # Debug: in ra cấu trúc của kết quả
-            print(f"Search results count: {len(search_results) if search_results else 0}")
-            
-            # Tìm các ảnh trong database dựa vào kết quả FAISS
+            else:
+                # Nếu không có ảnh nào được cung cấp, bạn có thể xử lý tìm kiếm theo query văn bản.
+                # (Chỉ áp dụng nếu bạn hỗ trợ tìm kiếm text; nếu không, trả về thông báo lỗi.)
+                results = search_engine.search(query, top_k=top_k)
+
+            # Lấy thêm thông tin từ database, nếu kết quả trả về có id liên kết với model Image
             results_with_db_data = []
-            
-            for result in search_results:
-                # Đảm bảo result là dictionary
-                if not isinstance(result, dict):
-                    print(f"Bỏ qua kết quả không hợp lệ: {result}")
-                    continue
-                    
-                # Xác định ID từ kết quả
-                image_id = None
-                if 'id' in result:
+            for result in results:
+                image_id = result.get('id')
+                if image_id:
                     try:
-                        # Chuyển đổi ID thành số nguyên nếu có thể
-                        image_id = int(result['id']) if isinstance(result['id'], str) else result['id']
-                    except (ValueError, TypeError):
-                        print(f"Không thể chuyển đổi ID: {result.get('id')}")
-                        
-                # Nếu có ID hợp lệ, tìm trong database
-                if image_id is not None:
-                    try:
-                        # Lọc ảnh theo người dùng và quyền truy cập
                         if request.user.is_authenticated:
                             img = Image.objects.filter(
-                                Q(id=image_id, is_public=True) | 
+                                Q(id=image_id, is_public=True) |
                                 Q(id=image_id, user=request.user.userprofile)
                             ).first()
                         else:
-                            img = Image.objects.filter(
-                                id=image_id, 
-                                is_public=True
-                            ).first()
-                        
-                        # Nếu tìm thấy ảnh trong database
+                            img = Image.objects.filter(id=image_id, is_public=True).first()
+
                         if img:
-                            # Tạo kết quả với dữ liệu từ database
                             result_item = {
                                 'id': img.id,
                                 'file': img.file.url if hasattr(img.file, 'url') else str(img.file),
@@ -426,47 +416,36 @@ class ImageSearchViewSet(viewsets.ViewSet):
                                 'distance': result.get('distance', 0),
                                 'similarity': round(100 * (1 - min(result.get('distance', 0) / 2, 1)), 2)
                             }
-                            
-                            # Thêm các trường tùy chọn tùy thuộc vào model của bạn
+                            # Thêm các trường thông tin khác nếu cần
                             if hasattr(img, 'user'):
-                                if hasattr(img.user, 'user') and hasattr(img.user.user, 'username'):
-                                    result_item['user'] = img.user.user.username
-                                else:
-                                    result_item['user'] = str(img.user)
-                                    
+                                result_item['user'] = str(img.user)
                             if hasattr(img, 'likes'):
                                 result_item['likes'] = img.likes
-                                
                             if hasattr(img, 'is_public'):
                                 result_item['is_public'] = img.is_public
-                                
+
                             results_with_db_data.append(result_item)
+                            continue
                     except Exception as e:
                         print(f"Lỗi khi xử lý ảnh ID {image_id}: {str(e)}")
-                else:
-                    # Nếu không có ID hoặc không tìm thấy trong database, sử dụng thông tin từ kết quả FAISS
-                    file_url = result.get('file', '')
-                    result_item = {
-                        'file': file_url,
-                        'distance': result.get('distance', 0),
-                        'similarity': round(100 * (1 - min(result.get('distance', 0) / 2, 1)), 2),
-                        'from_index_only': True  # Đánh dấu rằng đây chỉ là dữ liệu từ index
-                    }
-                    
-                    # Sao chép các trường khác nếu có
-                    for key in result:
-                        if key not in result_item and key != 'distance':
-                            result_item[key] = result[key]
-                            
-                    results_with_db_data.append(result_item)
-            
+                # Nếu không có thông tin id hay không liên kết với database, trả về thông tin tìm kiếm trực tiếp từ index
+                result_item = {
+                    'file': result.get('file', ''),
+                    'distance': result.get('distance', 0),
+                    'similarity': round(100 * (1 - min(result.get('distance', 0) / 2, 1)), 2),
+                    'from_index_only': True
+                }
+                for key in result:
+                    if key not in result_item and key != 'distance':
+                        result_item[key] = result[key]
+                results_with_db_data.append(result_item)
+
             return Response({
                 'count': len(results_with_db_data),
                 'results': results_with_db_data
             })
-                
+
         except Exception as e:
-            import traceback
             error_traceback = traceback.format_exc()
             print(f"ERROR: {str(e)}")
             print(f"TRACEBACK: {error_traceback}")
@@ -474,33 +453,52 @@ class ImageSearchViewSet(viewsets.ViewSet):
                 'error': f'Lỗi khi tìm kiếm ảnh tương tự: {str(e)}',
                 'traceback': error_traceback
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
     @action(detail=False, methods=['post'], url_path='upload')
     def search_by_upload(self, request):
         """Endpoint tìm kiếm bằng file ảnh tải lên"""
         self.permission_classes = [AllowAny]
-
         image_file = request.FILES.get('image_file')
         if not image_file:
             return Response({
                 "error": "Vui lòng cung cấp file ảnh"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Sử dụng phương thức create để xử lý
+
+        # Dùng create để xử lý tìm kiếm
         return self.create(request)
-    
+    @action(detail=False, methods=['post'], url_path='text')
+    def search_by_text(self, request):
+        query = request.data.get('query', '')
+        top_k = int(request.data.get('top_k', 20))
+
+        if not query:
+            return Response({"error": "Vui lòng cung cấp query"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            search_engine = CLIPImageSearch()
+            results = search_engine.search(query, top_k=top_k)
+            return Response({
+                'count': len(results),
+                'results': results
+            })
+        except Exception as e:
+            import traceback
+            return Response({
+                'error': str(e),
+                'traceback': traceback.format_exc()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['post'], url_path='url')
     def search_by_url(self, request):
         """Endpoint tìm kiếm bằng URL ảnh"""
         self.permission_classes = [AllowAny]
-
         image_url = request.data.get('image_url')
         if not image_url:
             return Response({
                 "error": "Vui lòng cung cấp URL ảnh"
             }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Sử dụng phương thức create để xử lý
+
+        # Dùng create để xử lý tìm kiếm
         return self.create(request)
 class ImagesCategoryViewSet(viewsets.ModelViewSet):
     queryset = ImageCategory.objects.select_related('image', 'category', 'image__user').order_by('id')
