@@ -17,7 +17,8 @@ export async function handleProfileClick(username: string) {
         "followers": data.followers_count,
         "following": data.following_count,
         "photos": data.photos_count,
-        "social_link": data.social_link
+        "social_link": data.social_link,
+        "created_at": data.created_at
     }
     localStorage.setItem("profile_id", data.id)
     return profileData

@@ -7,6 +7,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.conf import settings
 from imageretrieval.incremental_update import IndexUpdater
+from clip_retrieval.clip_search import CLIPImageSearch
 from pathlib import Path
 
 
@@ -23,6 +24,7 @@ MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
 INDEX_CLIP_DIR = settings.INDEX_CLIP_DIR
 INDEX_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_index_clip.faiss"
 MAPPING_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_mapping_clip.pkl"
+clip_search = CLIPImageSearch()
 
 # Singleton pattern để giữ updater trong bộ nhớ
 _updater_instance = None
@@ -116,30 +118,25 @@ class Image(models.Model):
 
 
 @receiver(post_save, sender=Image)
-def update_image_index(sender, instance, created, **kwargs):
-    if created and instance.is_public: 
+def update_clip_index(sender, instance, created, **kwargs):
+    """Update CLIP index when a new image is added"""
+    if created and instance.is_public:  # Only process if the image is newly created and public
         try:
-            updater = get_updater()
-            updater.update_index([instance])
-            updater.save(INDEX_PATH, MAPPING_PATH)
-            print(f"✅ Đã thêm ảnh #{instance.id} vào index")
+            clip_search.update_index_for_image(instance.id)
+            print(f"✅ Successfully added image #{instance.id} to the CLIP index")
         except Exception as e:
-            print(f"❌ Lỗi khi cập nhật index: {e}")
+            print(f"❌ Error updating CLIP index for image #{instance.id}: {e}")
 
 
 @receiver(post_delete, sender=Image)
 def remove_image_from_index(sender, instance, **kwargs):
-    """Signal handler để xóa ảnh khỏi index khi ảnh bị xóa"""
-    if instance.is_public:  # Chỉ xử lý ảnh công khai
+    """Remove an image from the CLIP index when it is deleted"""
+    if instance.is_public:  # Only process if the image is public
         try:
-            updater = get_updater()
-            updater.remove_from_index([instance.id])
-            # Lưu index và mapping sau khi cập nhật
-            updater.save(INDEX_PATH, MAPPING_PATH)
-            print(f"✅ Đã xóa ảnh #{instance.id} khỏi index")
+            clip_search.remove_from_index(instance.id)
+            print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
         except Exception as e:
-            print(f"❌ Lỗi khi xóa ảnh khỏi index: {e}")
-
+            print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
 
 class ImageCategory(models.Model):
     image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="categories")
