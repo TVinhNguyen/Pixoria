@@ -49,7 +49,7 @@ export default function CollectionModal({ isOpen, onClose, imageId, imageUrl }: 
     setToastVariant(variant)
     setToastMessage({ title, description, duration })
     setToastOpen(true)
-}
+  }
 
   const fetchCollections = async () => {
     try {

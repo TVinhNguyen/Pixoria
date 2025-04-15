@@ -122,6 +122,11 @@ export default function Profile() {
     }
   }, [isEditCollectionModalOpen])
 
+  useEffect(() => {
+    if (!isCollectionImagesOpen) {
+      fetchCollections()
+    }
+  }, [isCollectionImagesOpen])
 
   if (loading) {
     return (

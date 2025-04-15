@@ -121,3 +121,32 @@ export async function loadImagesFromCollection(collectionId: string) {
     )
     return imageDetails
 }
+
+export async function handleRemoveImageFromCollection(collectionId: string, imageId: number) {
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    if (!response.ok) {
+        throw new Error("Failed to delete collection")
+    }
+    const data = await response.json()
+    const imageIds = data.images
+    const updatedImageIds = imageIds.filter((id: number) => id !== imageId)
+    const patchResponse = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+        method: "PATCH",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        body: JSON.stringify({
+            images: updatedImageIds,
+        }),
+    })
+    if (!patchResponse.ok) {
+        throw new Error("Failed to update collection")
+    }
+    return await patchResponse.json()
+}
