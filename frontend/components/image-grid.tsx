@@ -252,7 +252,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
                       >
                         <Download className="h-5 w-5" />
                         {image.downloads > 0 && (
-                          <span className="absolute -bottom-1 -right-1 bg-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
                             {image.downloads > 99 ? "99+" : image.downloads}
                           </span>
                         )}
