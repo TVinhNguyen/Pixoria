@@ -24,7 +24,10 @@ MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
 INDEX_CLIP_DIR = settings.INDEX_CLIP_DIR
 INDEX_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_index_clip.faiss"
 MAPPING_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_mapping_clip.pkl"
-clip_search = CLIPImageSearch()
+
+# Replace the module-level instantiation with a function to get the singleton instance
+def get_clip_search():
+    return CLIPImageSearch.get_instance()
 
 # Singleton pattern để giữ updater trong bộ nhớ
 _updater_instance = None
@@ -122,8 +125,8 @@ def update_clip_index(sender, instance, created, **kwargs):
     """Update CLIP index when a new image is added"""
     if created and instance.is_public:  # Only process if the image is newly created and public
         try:
-            clip_search.update_index_for_image(instance.id)
-            print(f"✅ Successfully added image #{instance.id} to the CLIP index")
+            get_clip_search().update_index_for_image(instance.id)
+            print(f"✅ Successfully added image  #{instance.id} to the CLIP index")
         except Exception as e:
             print(f"❌ Error updating CLIP index for image #{instance.id}: {e}")
 
@@ -133,7 +136,7 @@ def remove_image_from_index(sender, instance, **kwargs):
     """Remove an image from the CLIP index when it is deleted"""
     if instance.is_public:  # Only process if the image is public
         try:
-            clip_search.remove_from_index(instance.id)
+            get_clip_search().remove_from_index(instance.id)
             print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
         except Exception as e:
             print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
@@ -218,6 +221,7 @@ class Notification(models.Model):
         ordering = ['-sent_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+
 
 class LikedImage(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="liked_images")

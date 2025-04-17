@@ -9,6 +9,8 @@ from rest_framework.generics import CreateAPIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from clip_retrieval.clip_search import CLIPImageSearch
+import boto3
+from django.conf import settings
 
 import os
 import tempfile
@@ -178,6 +180,70 @@ class ImageViewSet(viewsets.ModelViewSet):
         Tự động gán người dùng hiện tại khi tạo ảnh mới
         """
         serializer.save(user=self.request.user.userprofile)
+    def perform_destroy(self, instance):
+        """
+        Xoá ảnh trên AWS S3 trước khi xoá bản ghi trong database
+        """
+        s3 = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+
+        # Store ID for later logging
+        image_id = instance.id
+        file_name = instance.file.name if instance.file else "No file"
+
+        try:
+            if instance.file:
+                s3_key = instance.file.name
+                s3.delete_object(Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=s3_key)
+                print(f"Deleted from S3: {s3_key}")
+        except Exception as e:
+            print(f"Error deleting from S3: {e}")
+
+        # Force direct deletion with Django ORM - bypass the soft delete mechanism if any
+        try:
+            from django.db import connection
+            # Ensure Django's signals are triggered for proper cleanup of related data
+            Image.objects.filter(id=instance.id).delete()
+            print(f"Successfully deleted Image #{image_id} ({file_name}) from database using ORM")
+        except Exception as e:
+            print(f"Error using ORM delete for Image #{image_id}: {e}")
+            try:
+                # Last resort: direct SQL delete
+                print(f"Attempting direct SQL delete for Image #{image_id}")
+                with connection.cursor() as cursor:
+                    cursor.execute("DELETE FROM media_image WHERE id = %s", [instance.id])
+                print(f"Successfully deleted Image #{image_id} using direct SQL")
+            except Exception as e2:
+                print(f"Error using direct SQL delete: {e2}")
+                # If all else fails, try the default mechanism
+                try:
+                    super().perform_destroy(instance)
+                except Exception as e3:
+                    print(f"Final error deleting Image #{image_id}: {e3}")
+                    raise
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Override destroy method to ensure image is deleted from database
+        """
+        instance = self.get_object()
+        # Store ID for later reference
+        image_id = instance.id
+        file_name = instance.file.name if instance.file else "No file"
+        
+        # Get confirmation from perform_destroy before returning response
+        self.perform_destroy(instance)
+        
+        # Log to verify deletion was successful
+        print(f"Database record for Image #{image_id} ({file_name}) has been deleted")
+        
+        # Return no content response
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     
     @action(detail=False, permission_classes=[AllowAny], url_path='user/(?P<username>[^/.]+)')
     def user_images(self, request, username=None):
@@ -213,6 +279,7 @@ class ImageViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+
     
     @action(detail=True, methods=['post'], url_path='like')
     def like_image(self, request, pk=None):
@@ -365,38 +432,32 @@ class ImageSearchViewSet(viewsets.ViewSet):
         })
 
     def create(self, request):
-        """
-        Xử lý tìm kiếm ảnh (POST request).
-        Hỗ trợ tìm kiếm bằng cách:
-         - Sử dụng URL ảnh: key "image_url" trong request.data.
-         - Sử dụng file ảnh: key "image_file" trong request.FILES.
-         - Nếu không có ảnh thì có thể thực hiện tìm kiếm theo query text (ví dụ key "query") nếu bạn muốn.
-        """
+        """Xử lý tìm kiếm ảnh (tương đương với POST request trong APIView)"""
+        # Kiểm tra dữ liệu đầu vào
         image_file = request.FILES.get('image_file')
         image_url = request.data.get('image_url')
-        # Nếu muốn hỗ trợ tìm kiếm theo query text (không dùng ảnh) thì bạn có thể lấy key "query"
-        query = request.data.get('query', '')
+        query = request.data.get('query')
         top_k = int(request.data.get('top_k', 12))
 
         try:
-            # Khởi tạo đối tượng tìm kiếm (có thể là singleton hoặc một instance mới)
-            search_engine = CLIPImageSearch()
-            # Nếu bạn cần load FAISS index, hãy chắc chắn gọi: search_engine.load_faiss_index("path/to/index_file")
+            # Use singleton pattern to get CLIPImageSearch instance
+            search_engine = CLIPImageSearch.get_instance()
 
             # Ưu tiên tìm kiếm theo ảnh dựa trên URL
             if image_url:
                 # Sử dụng search() của CLIPImageSearch – phiên bản dùng URL để tải ảnh và xử lý embedding
-                results = search_engine.search(image_url, top_k=top_k)
+                results = search_engine.search_by_image(image_url, top_k=top_k)
             elif image_file:
                 # Lưu file ảnh tạm thời để xử lý
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
                     for chunk in image_file.chunks():
                         tmp.write(chunk)
                     tmp_path = tmp.name
-
+                    
                 try:
                     results = search_engine.search_by_image(tmp_path, top_k=top_k)
                 finally:
+                    # Xóa file tạm
                     if os.path.exists(tmp_path):
                         os.unlink(tmp_path)
             else:
@@ -487,7 +548,8 @@ class ImageSearchViewSet(viewsets.ViewSet):
             return Response({"error": "Vui lòng cung cấp query"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            search_engine = CLIPImageSearch()
+            # Use singleton pattern to get CLIPImageSearch instance
+            search_engine = CLIPImageSearch.get_instance()
             results = search_engine.search(query, top_k=top_k)
             return Response({
                 'count': len(results),
