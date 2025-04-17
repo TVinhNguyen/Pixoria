@@ -506,6 +506,7 @@ export default function ProfilePage() {
         <CollectionImagesModal
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
+          username={username}
           collectionId={selectedCollectionId}
         />
       )}

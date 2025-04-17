@@ -501,10 +501,11 @@ export default function Profile() {
         />
       )}
 
-      { isCollectionImagesOpen && selectedCollectionId != null && (
+      { isCollectionImagesOpen && selectedCollectionId && (
         <CollectionImagesModal
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
+          username=""
           collectionId={selectedCollectionId}
         />
       )}

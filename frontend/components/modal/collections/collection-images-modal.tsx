@@ -28,10 +28,11 @@ interface CollectionImage {
 interface CollectionImagesModalProps {
   isOpen: boolean
   onClose: () => void
+  username: string
   collectionId: number
 }
 
-export default function CollectionImagesModal({ isOpen, onClose, collectionId }: CollectionImagesModalProps) {
+export default function CollectionImagesModal({ isOpen, onClose,username, collectionId }: CollectionImagesModalProps) {
   const [collection, setCollection] = useState<Collection | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -53,8 +54,8 @@ export default function CollectionImagesModal({ isOpen, onClose, collectionId }:
   const fetchCollectionData = async () => {
     try {
       setLoading(true)
-      const data = await handleGetCollectionById(collectionId.toString())
-      const images = await loadImagesFromCollection(collectionId.toString())
+      const data = await handleGetCollectionById(username,collectionId.toString())
+      const images = await loadImagesFromCollection(username,collectionId.toString())
       data.images = images
       setCollection(data)
       
