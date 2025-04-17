@@ -205,7 +205,7 @@ class UserProfileMinSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserProfile
-        fields = ['id', 'user_id', 'username', 'avatar']  # Adjust fields as needed for your UserProfile
+        fields = ['id', 'user_id', 'username', 'avatar', 'display_name']  # Adjust fields as needed for your UserProfile
 
 class FollowSerializer(serializers.ModelSerializer):
     """Serializer for Follow model"""

@@ -20,7 +20,9 @@ export async function handleProfileClick(username: string) {
         "social_link": data.social_link,
         "created_at": data.created_at
     }
+    console.log(data)
     localStorage.setItem("profile_id", data.id)
+    localStorage.setItem("user_id", data.user.id)
     return profileData
 }
 
