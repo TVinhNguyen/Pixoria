@@ -7,6 +7,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.conf import settings
 from imageretrieval.incremental_update import IndexUpdater
+from clip_retrieval.clip_search import CLIPImageSearch
 from pathlib import Path
 
 
@@ -23,6 +24,10 @@ MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
 INDEX_CLIP_DIR = settings.INDEX_CLIP_DIR
 INDEX_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_index_clip.faiss"
 MAPPING_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_mapping_clip.pkl"
+
+# Replace the module-level instantiation with a function to get the singleton instance
+def get_clip_search():
+    return CLIPImageSearch.get_instance()
 
 # Singleton pattern để giữ updater trong bộ nhớ
 _updater_instance = None
@@ -94,33 +99,47 @@ class Image(models.Model):
         """ Tự động cập nhật số lượng ảnh khi lưu """
         super().save(*args, **kwargs)
         self.user.update_counts()
+    
+    def like_image(self, user_profile):
+        """ Hàm xử lý khi user like ảnh """
+        if not LikedImage.objects.filter(user=user_profile, image=self).exists():
+            LikedImage.objects.create(user=user_profile, image=self)  # Thêm vào danh sách like
+            self.likes += 1  # Tăng số lượt like
+            self.save()
+            return True  # Like thành công
+        return False  # Đã like trước đó
+
+    def unlike_image(self, user_profile):
+        """ Hàm xử lý khi user bỏ like ảnh """
+        liked_image = LikedImage.objects.filter(user=user_profile, image=self)
+        if liked_image.exists():
+            liked_image.delete()  # Xóa khỏi danh sách like
+            self.likes -= 1  # Giảm số lượt like
+            self.save()
+            return True  # Bỏ like thành công
+        return False  # Ảnh chưa được like trước đó
 
 
 @receiver(post_save, sender=Image)
-def update_image_index(sender, instance, created, **kwargs):
-    if created and instance.is_public: 
+def update_clip_index(sender, instance, created, **kwargs):
+    """Update CLIP index when a new image is added"""
+    if created and instance.is_public:  # Only process if the image is newly created and public
         try:
-            updater = get_updater()
-            updater.update_index([instance])
-            updater.save(INDEX_PATH, MAPPING_PATH)
-            print(f"✅ Đã thêm ảnh #{instance.id} vào index")
+            get_clip_search().update_index_for_image(instance.id)
+            print(f"✅ Successfully added image  #{instance.id} to the CLIP index")
         except Exception as e:
-            print(f"❌ Lỗi khi cập nhật index: {e}")
+            print(f"❌ Error updating CLIP index for image #{instance.id}: {e}")
 
 
 @receiver(post_delete, sender=Image)
 def remove_image_from_index(sender, instance, **kwargs):
-    """Signal handler để xóa ảnh khỏi index khi ảnh bị xóa"""
-    if instance.is_public:  # Chỉ xử lý ảnh công khai
+    """Remove an image from the CLIP index when it is deleted"""
+    if instance.is_public:  # Only process if the image is public
         try:
-            updater = get_updater()
-            updater.remove_from_index([instance.id])
-            # Lưu index và mapping sau khi cập nhật
-            updater.save(INDEX_PATH, MAPPING_PATH)
-            print(f"✅ Đã xóa ảnh #{instance.id} khỏi index")
+            get_clip_search().remove_from_index(instance.id)
+            print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
         except Exception as e:
-            print(f"❌ Lỗi khi xóa ảnh khỏi index: {e}")
-
+            print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
 
 class ImageCategory(models.Model):
     image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="categories")
@@ -141,6 +160,7 @@ class Collection(models.Model):
     images = models.ManyToManyField(Image, related_name='collections', blank=True)
     is_public = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    cover_image = models.URLField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} ({'Public' if self.is_public else 'Private'})"
@@ -176,6 +196,7 @@ class Follow(models.Model):
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('like', 'Like'),
+        ('download', 'Download'),
         ('comment', 'Comment'),
         ('follow', 'Follow'),
         ('mention', 'Mention'),
@@ -200,4 +221,28 @@ class Notification(models.Model):
         ordering = ['-sent_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
-        
+
+
+class LikedImage(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="liked_images")
+    image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="liked_by")
+    liked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'image')
+        ordering = ['-liked_at']
+
+    def __str__(self):
+        return f"{self.user.user.username} liked {self.image.title or 'Untitled'}"
+
+class DownloadedImage(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name="downloaded_images")
+    image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="downloaded_by")
+    downloaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'image')
+        ordering = ['-downloaded_at']
+
+    def __str__(self):
+        return f"{self.user.user.username} downloaded {self.image.title or 'Untitled'}"

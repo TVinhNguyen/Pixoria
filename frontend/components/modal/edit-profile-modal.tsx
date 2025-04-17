@@ -14,17 +14,37 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { handleProfileEdit, handleProfileClick } from "@/lib/api-action/api-profile"
 
 const scrollbarStyles = `
-    .custom-scrollbar::-webkit-scrollbar {
-      width: 5px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-      background-color: rgba(155, 155, 155, 0.5);
-      border-radius: 20px;
-    }
-  `
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, rgba(168, 85, 247, 0.5), rgba(236, 72, 153, 0.5));
+    border-radius: 20px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, rgba(168, 85, 247, 0.7), rgba(236, 72, 153, 0.7));
+  }
+  .scroll-fade-bottom {
+    position: relative;
+  }
+  .scroll-fade-bottom.fade-active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30px;
+    background: linear-gradient(to top, rgba(255, 255, 255, 0.9), transparent);
+    pointer-events: none;
+  }
+  .dark .scroll-fade-bottom.fade-active::after {
+    background: linear-gradient(to top, rgba(17, 17, 17, 0.9), transparent);
+  }
+`
 
 interface ProfileData {
   username: string
@@ -62,7 +82,6 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
           setPreviewAvatar(null)
         } catch (error) {
           console.error("Error fetching profile data:", error)
-          // Fallback to the profile prop if API call fails
           setFormData(profile)
         } finally {
           setIsLoading(false)
@@ -150,9 +169,14 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   if (isLoading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px] border-none">
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <DialogContent className="sm:max-w-[500px] border-none bg-gradient-to-br from-white to-purple-50 dark:from-gray-950 dark:to-purple-950/20 backdrop-blur-sm">
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="w-16 h-16 relative">
+              <div className="absolute inset-0 rounded-full border-t-2 border-purple-600 animate-spin"></div>
+              <div className="absolute inset-2 rounded-full border-t-2 border-pink-600 animate-spin animation-delay-150"></div>
+              <div className="absolute inset-4 rounded-full border-t-2 border-fuchsia-600 animate-spin animation-delay-300"></div>
+            </div>
+            <p className="mt-4 text-purple-600 dark:text-purple-400 animate-pulse">Loading profile...</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -162,10 +186,17 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
   if (!formData) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[500px] border-none">
+        <DialogContent className="sm:max-w-[500px] border-none bg-gradient-to-br from-white to-purple-50 dark:from-gray-950 dark:to-purple-950/20 backdrop-blur-sm">
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="text-destructive mb-4">Failed to load profile data</p>
-            <Button variant="outline" onClick={onClose}>
+            <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+              <span className="text-2xl text-red-500">!</span>
+            </div>
+            <p className="text-red-500 mb-4 font-medium">Failed to load profile data</p>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="transition-all hover:shadow-sm bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-purple-200 dark:border-purple-900/30 hover:border-purple-400 dark:hover:border-purple-700"
+            >
               Close
             </Button>
           </div>
@@ -179,32 +210,33 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
       <style jsx global>
         {scrollbarStyles}
       </style>
-      <DialogContent className="sm:max-w-[500px] max-h-[95vh] overflow-hidden border-none">
+      <DialogContent className="sm:max-w-[500px] max-h-[95vh] overflow-hidden border-none bg-gradient-to-br from-white to-purple-50 dark:from-gray-950 dark:to-purple-950/20 backdrop-blur-sm shadow-xl">
         <DialogHeader className="pb-2">
-          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text">
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-600 text-transparent bg-clip-text">
             Edit Profile
           </DialogTitle>
+          <div className="h-1 w-32 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full mt-1"></div>
         </DialogHeader>
 
         <div
           ref={contentRef}
-          className={`custom-scrollbar overflow-y-auto pr-2 scroll-fade-bottom ${showBottomFade ? "fade-active" : ""}`}
+          className={`custom-scrollbar overflow-y-auto px-2 scroll-fade-bottom ${showBottomFade ? "fade-active" : ""}`}
           style={{ maxHeight: "calc(90vh - 140px)" }}
         >
           <form onSubmit={handleSubmit} className="space-y-6 py-4">
             <div className="flex flex-col items-center space-y-4">
               <div
-                className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-primary cursor-pointer group shadow-md"
+                className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-primary cursor-pointer group shadow-lg ring-4 ring-purple-200 dark:ring-purple-900/30"
                 onClick={handleAvatarClick}
               >
                 <Image
-                  src={previewAvatar || formData.avatar || "/placeholder.svg?height=96&width=96"}
+                  src={previewAvatar || formData.avatar || "/placeholder.svg?height=112&width=112"}
                   alt="Profile avatar"
                   fill
                   className="object-cover"
                 />
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-8 h-8 text-white" />
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/60 to-pink-500/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+                  <Camera className="w-10 h-10 text-white drop-shadow-md" />
                 </div>
               </div>
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
@@ -213,9 +245,9 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                 variant="outline"
                 size="sm"
                 onClick={handleAvatarClick}
-                className="transition-all hover:shadow-md"
+                className="transition-all hover:shadow-md bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-purple-200 dark:border-purple-900/30 hover:border-purple-400 dark:hover:border-purple-700"
               >
-                <Upload className="mr-2 h-4 w-4" />
+                <Upload className="mr-2 h-4 w-4 text-purple-600" />
                 Change Avatar
               </Button>
             </div>
@@ -230,7 +262,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                   name="display_name"
                   value={formData.display_name}
                   onChange={handleChange}
-                  className="focus-visible:ring-primary transition-shadow hover:border-primary/50"
+                  className="focus-visible:ring-purple-500 focus-visible:ring-offset-0 transition-all duration-300 hover:border-purple-300 dark:hover:border-purple-700 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm"
                 />
               </div>
 
@@ -244,7 +276,7 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                   value={formData.bio || ""}
                   onChange={handleChange}
                   rows={4}
-                  className="focus-visible:ring-primary resize-none transition-shadow hover:border-primary/50"
+                  className="focus-visible:ring-purple-500 focus-visible:ring-offset-0 resize-none transition-all duration-300 hover:border-purple-300 dark:hover:border-purple-700 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm"
                 />
               </div>
 
@@ -257,29 +289,29 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
                   name="social_link"
                   value={formData.social_link || ""}
                   onChange={handleChange}
-                  className="focus-visible:ring-primary transition-shadow hover:border-primary/50"
+                  className="focus-visible:ring-purple-500 focus-visible:ring-offset-0 transition-all duration-300 hover:border-purple-300 dark:hover:border-purple-700 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm"
                   placeholder="https://example.com"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label className="text-muted-foreground text-sm">Account Information (Non-editable)</Label>
-                <div className="p-4 rounded-md bg-muted/30 border backdrop-blur-sm">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Username</p>
+                <Label className="text-sm">Account Information</Label>
+                <div className="p-4 rounded-md bg-white/50 dark:bg-gray-900/50 border border-purple-100 dark:border-purple-900/30 backdrop-blur-sm shadow-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Username</p>
                       <p className="text-sm font-medium">@{profile.username}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Followers</p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Followers</p>
                       <p className="text-sm font-medium">{profile.followers?.toLocaleString() || 0}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Following</p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Following</p>
                       <p className="text-sm font-medium">{profile.following?.toLocaleString() || 0}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Photos</p>
+                    <div className="space-y-1">
+                      <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Photos</p>
                       <p className="text-sm font-medium">{profile.photos?.toLocaleString() || 0}</p>
                     </div>
                   </div>
@@ -289,16 +321,27 @@ export default function ProfileEditModal({ isOpen, onClose, profile }: ProfileEd
           </form>
         </div>
 
-        <DialogFooter className="sm:justify-between mt-4 pt-2 border-t">
-          <Button type="button" variant="outline" onClick={onClose} className="transition-all hover:shadow-sm">
+        <DialogFooter className="sm:justify-between mt-4 pt-2 border-t border-purple-100 dark:border-purple-900/30">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            className="transition-all hover:shadow-sm bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-purple-200 dark:border-purple-900/30 hover:border-purple-400 dark:hover:border-purple-700"
+          >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all hover:shadow-md"
+            className="bg-gradient-to-r from-purple-600 via-fuchsia-500 to-pink-600 hover:from-purple-700 hover:via-fuchsia-600 hover:to-pink-700 transition-all hover:shadow-md"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {isSubmitting ? (
+              <>
+                <span className="animate-spin mr-2">⟳</span> Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

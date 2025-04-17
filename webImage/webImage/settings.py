@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     # Local apps
     'media',
     'imageretrieval',
-    'clip',
+    # 'clip',
     # For request to server (pip install django-cors-headers)
     
 

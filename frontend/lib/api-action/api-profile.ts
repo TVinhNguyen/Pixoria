@@ -17,9 +17,12 @@ export async function handleProfileClick(username: string) {
         "followers": data.followers_count,
         "following": data.following_count,
         "photos": data.photos_count,
-        "social_link": data.social_link
+        "social_link": data.social_link,
+        "created_at": data.created_at
     }
+    console.log(data)
     localStorage.setItem("profile_id", data.id)
+    localStorage.setItem("user_id", data.user.id)
     return profileData
 }
 
@@ -34,5 +37,40 @@ export async function handleProfileEdit(formData: any) {
     })
     const data = await response.json()
     console.log(data)
+    return data
+}
+
+export async function loadAllUploadedImages() {
+    const username = localStorage.getItem("username")
+    const response = await fetch(`${API_BASE_URL}/images/user/${username}/`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
+    console.log(data)
+    return data
+}
+
+export async function loadAllLikedImages() {
+    const response = await fetch(`${API_BASE_URL}/liked-image`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
+    return data
+}
+
+export async function loadAllDownloadedImages() {
+    const response = await fetch(`${API_BASE_URL}/downloaded-image`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    const data = await response.json()
     return data
 }

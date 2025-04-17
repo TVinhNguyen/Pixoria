@@ -13,7 +13,6 @@ import Link from "next/link"
 
 import { handleLoginClick } from "@/lib/api-action/api-login"
 import { handleSignupClick } from "@/lib/api-action/api-signup"
-import ErrorModal from "./error-modal"
 
 interface LoginModalProps {
   isOpen: boolean
@@ -277,13 +276,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
             </form>
           </TabsContent>
         </Tabs>
-
-        <ErrorModal
-          title="Notification"
-          message={notificationMessage}
-          isOpen={isNotificationOpen}
-          onClose={() => setIsNotificationOpen(false)}
-        />
       </div>
     </div>
   )
