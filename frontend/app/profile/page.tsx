@@ -5,19 +5,28 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon } from "lucide-react"
+import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon, ChartNoAxesColumnDecreasingIcon } from "lucide-react"
 import {
   handleProfileClick,
   loadAllUploadedImages,
   loadAllLikedImages,
   loadAllDownloadedImages,
 } from "@/lib/api-action/api-profile"
+import { getAllFollowers, getAllFollowing } from "@/lib/api-action/api-follow"
 import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 import EditCollectionModal from "@/components/modal/collections/edit-collection-modal"
 import CollectionImagesModal from "@/components/modal/collections/collection-images-modal"
+import FollowsModal from "@/components/modal/follow/follow-modal"
+import ToastNotification from "@/components/modal/message-modal"
+import { set } from "date-fns"
 
 export default function Profile() {
+  // chỗ này được dùng để set mấy cái toast
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+
   const router = useRouter()
   const tabParams = useSearchParams()
   const defaultTab = tabParams.get("tab") || "photos"
@@ -38,6 +47,17 @@ export default function Profile() {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null)
   const [isEditCollectionModalOpen, setIsEditCollectionModalOpen] = useState(false)
   const [isCollectionImagesOpen, setIsCollectionImagesOpen] = useState(false)
+
+  const [isFollowersOpen, setIsFollowersOpen] = useState(false)
+  const [isFollowingOpen, setIsFollowingOpen] = useState(false)
+  const [followersList, setFollowersList] = useState<any[]>([])
+  const [followingList, setFollowingList] = useState<any[]>([])
+
+  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+    setToastVariant(variant)
+    setToastMessage({ title, description, duration })
+    setToastOpen(true)
+  }
 
   const fetchProfile = async () => {
     try {
@@ -122,6 +142,11 @@ export default function Profile() {
     }
   }, [isEditCollectionModalOpen])
 
+  useEffect(() => {
+    if (!isCollectionImagesOpen) {
+      fetchCollections()
+    }
+  }, [isCollectionImagesOpen])
 
   if (loading) {
     return (
@@ -140,6 +165,44 @@ export default function Profile() {
       fetchUserDownloadedImages()
     } else if (value === "collections") {
       fetchCollections()
+    }
+  }
+
+  const handleClickShare = () => {
+    const url = window.location.origin + window.location.pathname
+    navigator.clipboard.writeText(url)
+    setNotification("success", "Success", "Sucessfully copy your profile link to clipboard.", 3000)
+  }
+
+  const handleClickFollowing = () => {
+    console.log("Following clicked")
+    fetchFollowing()
+    setIsFollowingOpen(true)
+  }
+
+  const handleClickFollowers = () => {
+    console.log("Followers clicked")
+    fetchFollowers()
+    setIsFollowersOpen(true)
+  }
+
+  const fetchFollowers = async () => {
+    try {
+      const mockFollowers = await getAllFollowers(Number(localStorage.getItem("user_id")))
+      const followersArray = !Array.isArray(mockFollowers) && Array.isArray(mockFollowers.followers) ? mockFollowers.followers : []
+      setFollowersList(followersArray);
+    } catch (error) {
+      console.error("Error fetching followers:", error)
+    }
+  }
+
+  const fetchFollowing = async () => {
+    try {
+      const mockFollowing = await getAllFollowing(Number(localStorage.getItem("user_id")))
+      const followingArray = !Array.isArray(mockFollowing) && Array.isArray(mockFollowing.followings) ? mockFollowing.followings : []
+      setFollowingList(followingArray)
+    } catch (error) {
+      console.error("Error fetching following:", error)
     }
   }
 
@@ -181,7 +244,7 @@ export default function Profile() {
                 </a>
               </Button>
             )}
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={ handleClickShare }>
               <Share2 className="h-4 w-4 mr-2" />
               Share
             </Button>
@@ -201,13 +264,13 @@ export default function Profile() {
               </p>
               <p className="text-sm text-muted-foreground">Photos</p>
             </div>
-            <div className="text-center">
+            <div className="text-center cursor-pointer" onClick={handleClickFollowers}>
               <p className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text">
                 {profileData?.followers?.toLocaleString() || 0}
               </p>
               <p className="text-sm text-muted-foreground">Followers</p>
             </div>
-            <div className="text-center">
+            <div className="text-center cursor-pointer" onClick={handleClickFollowing}>
               <p className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text">
                 {profileData?.following || 0}
               </p>
@@ -446,6 +509,33 @@ export default function Profile() {
           collectionId={selectedCollectionId}
         />
       )}
+
+      { isFollowersOpen && (
+        <FollowsModal
+          isOpen={isFollowersOpen}
+          onClose={() => setIsFollowersOpen(false)}
+          type="followers"
+          users={followersList}
+        />
+      )}
+
+      { isFollowingOpen && (
+        <FollowsModal
+          isOpen={isFollowingOpen}
+          onClose={() => setIsFollowingOpen(false)}
+          type="following"
+          users={followingList}
+        />
+      )}
+
+      <ToastNotification
+        variant={toastVariant}
+        title={toastMessage.title}
+        description={toastMessage.description}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        duration={toastMessage.duration}
+      />
     </div>
   )
 }

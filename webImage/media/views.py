@@ -118,6 +118,7 @@ class CollectionViewSet(viewsets.ModelViewSet):
         if request.method in ['PUT', 'PATCH', 'DELETE']:
             if obj.user != request.user.userprofile:
                 self.permission_denied(request, message="Bạn không có quyền thực hiện thao tác này.")
+        
 
     def perform_create(self, serializer):
         # Khi tạo mới, gán owner là profile của người request

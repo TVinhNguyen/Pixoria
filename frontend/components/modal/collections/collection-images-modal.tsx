@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import Image from "next/image"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { MoveRight, Trash2 } from "lucide-react"
-import { toast } from "sonner"
-import { handleGetCollectionById, handleGetCollections, loadImagesFromCollection } from "@/lib/api-action/api-collection"
+import { handleGetCollectionById, handleGetCollections, loadImagesFromCollection,
+         handleRemoveImageFromCollection } from "@/lib/api-action/api-collection"
+import ToastNotification from "../message-modal"
+import CollectionModal from "./move-modal"
 
 interface Collection {
   id: number
@@ -33,9 +35,21 @@ interface CollectionImagesModalProps {
 export default function CollectionImagesModal({ isOpen, onClose,username, collectionId }: CollectionImagesModalProps) {
   const [collection, setCollection] = useState<Collection | null>(null)
   const [loading, setLoading] = useState(true)
-  const [otherCollections, setOtherCollections] = useState<Collection[]>([])
-  const [showMoveOptions, setShowMoveOptions] = useState<number | null>(null)
-  const [isSuccessful, setIsSuccessful] = useState(false)
+
+  // chỗ này được dùng để set mấy cái toast
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+
+  // chỗ này thì được dùng để mở cái model mà chuyển tới collection mới
+  const [collectionModalOpen, setCollectionModalOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<CollectionImage | null>(null)
+
+  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+    setToastVariant(variant)
+    setToastMessage({ title, description, duration })
+    setToastOpen(true)
+  }
 
   const fetchCollectionData = async () => {
     try {
@@ -46,7 +60,7 @@ export default function CollectionImagesModal({ isOpen, onClose,username, collec
       setCollection(data)
       
       const collectionsData = await handleGetCollections()
-      setOtherCollections(collectionsData.results.filter((c: Collection) => c.id !== collectionId))
+      //setOtherCollections(collectionsData.results.filter((c: Collection) => c.id !== collectionId))
     } catch (error) {
       console.error("Error fetching collection data:", error)
     } finally {
@@ -57,17 +71,30 @@ export default function CollectionImagesModal({ isOpen, onClose,username, collec
   useEffect(() => {
     if (isOpen && collectionId) {
       fetchCollectionData()
-    } else {
-      setShowMoveOptions(null)
     }
   }, [isOpen, collectionId])
 
   const handleRemoveImage = async (imageId: number) => {
-    
+    try {
+      const response = await handleRemoveImageFromCollection(collectionId.toString(), imageId)
+      if (response) {
+        setNotification("success", "Image Removed", "The image has been successfully removed from the collection.", 3000)
+        fetchCollectionData()
+      }
+    } catch (error) {
+      setNotification("error", "Error", "Failed to remove the image from the collection.", 3000)
+    }
   }
 
-  const handleMoveImage = async (imageId: number, targetCollectionId: number) => {
-    setShowMoveOptions(null)
+  const handleImageMoved = async (imageId: number) => {
+    await handleRemoveImageFromCollection(collectionId.toString(), imageId)
+    fetchCollectionData()
+    setNotification("success", "Image moved", "Image has been moved to another collection.", 3000)
+  }
+
+  const handleMoveImage = async (image: CollectionImage) => {
+    setSelectedImage(image)
+    setCollectionModalOpen(true)
   }
 
   return (
@@ -105,60 +132,28 @@ export default function CollectionImagesModal({ isOpen, onClose,username, collec
                 )}
 
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  {showMoveOptions === image.id ? (
-                    <div className="bg-black/80 p-2 rounded-lg">
-                      <p className="text-white text-xs mb-2">Move to:</p>
-                      <div className="flex flex-col gap-1 max-h-24 overflow-y-auto">
-                        {otherCollections.length > 0 ? (
-                          otherCollections.map((c) => (
-                            <Button
-                              key={c.id}
-                              variant="ghost"
-                              size="sm"
-                              className="justify-start h-7 text-xs text-white hover:bg-white/20"
-                              onClick={() => handleMoveImage(image.id, c.id)}
-                            >
-                              {c.name}
-                            </Button>
-                          ))
-                        ) : (
-                          <p className="text-gray-400 text-xs">No other collections available</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-2 w-full text-xs text-white hover:bg-white/20"
-                        onClick={() => setShowMoveOptions(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                        onClick={() => setShowMoveOptions(image.id)}
-                        title="Move to another collection"
-                      >
-                        <MoveRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="h-8 w-8 rounded-full bg-black/50 hover:bg-red-600 text-white"
-                        onClick={() => handleRemoveImage(image.id)}
-                        title="Remove from collection"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </>
-                  )}
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                      onClick={() => handleMoveImage(image)}
+                      title="Move to another collection"
+                    >
+                      <MoveRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="h-8 w-8 rounded-full bg-black/50 hover:bg-red-600 text-white"
+                      onClick={() => handleRemoveImage(image.id)}
+                      title="Remove from collection"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )
                 </div>
               </div>
-            ))}
+          ))}
           </div>
         ) : (
           <div className="flex justify-center items-center h-40">
@@ -166,6 +161,23 @@ export default function CollectionImagesModal({ isOpen, onClose,username, collec
           </div>
         )}
       </DialogContent>
+      <ToastNotification
+        variant={toastVariant}
+        title={toastMessage.title}
+        description={toastMessage.description}
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        duration={toastMessage.duration}
+      />
+      {selectedImage && (
+        <CollectionModal
+          isOpen={collectionModalOpen}
+          onClose={() => setCollectionModalOpen(false)}
+          imageId={selectedImage.id}
+          imageUrl={selectedImage.file}
+          onImageMoved={handleImageMoved}
+        />
+      )}
     </Dialog>
   )
 }

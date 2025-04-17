@@ -181,3 +181,47 @@ export async function getUserFollowing(userId: number, page = 1, pageSize = 10) 
         return { total: 0, following: [], next: null, previous: null }
     }
 }
+
+export async function getAllFollowers(userId: number) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/follows?follower_id=${userId}`, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        })
+        
+        if (response.ok) {
+            const data: FollowResponse = await response.json()
+            return {
+                followers: data.results.map(item => item.following_details)
+            }
+        }
+        return []
+    } catch (error) {
+        console.error("Error getting all followers:", error)
+        return []
+    }
+}
+
+export async function getAllFollowing(userId: number) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/follows/?following_id=${userId}`, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+        })
+        
+        if (response.ok) {
+            const data: FollowResponse = await response.json()
+            return {
+                followings: data.results.map(item => item.follower_details)
+            }
+        }
+        return []
+    } catch (error) {
+        console.error("Error getting all following:", error)
+        return []
+    }
+}
