@@ -12,6 +12,18 @@ export async function handleGetCollections() {
     }
     return await response.json()
 }
+export async function handleGetCollectionByUsername(username: string) {
+    const response = await fetch(`${API_BASE_URL}/profile/${username}/collections/`, {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+    })
+    if (!response.ok) {
+        throw new Error("Failed to fetch collections")
+    }
+    return await response.json()
+}
 
 export async function handleCreateCollection(name: string, description: string, is_public: boolean, cover_image: string) {
     const formData = new FormData()

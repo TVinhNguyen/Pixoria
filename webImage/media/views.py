@@ -100,28 +100,35 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 class CollectionViewSet(viewsets.ModelViewSet):
     serializer_class = CollectionSerializer
-    # permission_classes = [IsAuthenticated]
-    permission_classes = [AllowAny]
-
+    permission_classes = [IsAuthenticated]
+    
     def get_queryset(self):
-        user_profile = self.request.user.userprofile
-        # Khúc chỗ ni là chỉ hiển thị collection với điều kiện là public hoặc của user hiện tại
-        # return Collection.objects.filter(Q(is_public=True) | Q(user=user_profile))
-        # Dòng return này là return tất cả các collection của user hiện tại, cho dù là public hay private
-        return Collection.objects.filter(user=user_profile)
-
+        current_profile = self.request.user.userprofile
+        target_username = self.kwargs.get('username')
+        if target_username:
+            target_profile = get_object_or_404(UserProfile, user__username=target_username)
+            if target_profile == current_profile:
+                return Collection.objects.filter(user=target_profile)
+            else:
+                return Collection.objects.filter(user=target_profile, is_public=True)
+        else:
+            return Collection.objects.filter(user=current_profile)
     def check_object_permissions(self, request, obj):
-        if obj.user != request.user.userprofile:
-            self.permission_denied(request, message="Bạn không có quyền thực hiện thao tác này.")
+        # Kiểm tra quyền chỉnh sửa: chỉ chủ sở hữu mới được cập nhật hay xóa collection của mình
+        if request.method in ['PUT', 'PATCH', 'DELETE']:
+            if obj.user != request.user.userprofile:
+                self.permission_denied(request, message="Bạn không có quyền thực hiện thao tác này.")
+        
 
     def perform_create(self, serializer):
+        # Khi tạo mới, gán owner là profile của người request
         serializer.save(user=self.request.user.userprofile)
-
+    
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         self.check_object_permissions(request, instance)
         return super().update(request, *args, **kwargs)
-
+    
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.check_object_permissions(request, instance)

@@ -182,10 +182,8 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
             {displayedImages.map((image, index) => {
               const isLastElement = index === displayedImages.length - 1
 
-              // Lấy đường dẫn ảnh, ưu tiên file (API mới) rồi đến src (tương thích cũ)
               const imageSrc = image.file || image.src || ""
 
-              // Đảm bảo luôn có dữ liệu tác giả, nếu không có thì dùng dữ liệu mặc định
               const author = image.author || {
                 user_id: 0,
                 username: image.username || "photographer",
