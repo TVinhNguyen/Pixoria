@@ -25,13 +25,30 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 # INDEX_DIR = r".\mediafiles\clip_index"
 
 class CLIPImageSearch:
+    # Singleton instance
+    _instance = None
+    
+    @classmethod
+    def get_instance(cls):
+        """Singleton pattern to ensure only one instance is created"""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
     def __init__(self):
+        # This prevents re-initialization if this is a singleton instance
+        if hasattr(CLIPImageSearch, '_initialized') and CLIPImageSearch._initialized:
+            return
+            
         # Load CLIP model
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model, self.preprocess = clip.load("ViT-B/32", self.device)
         
         # Load data and FAISS index
         self.load_data()
+        
+        # Mark as initialized
+        CLIPImageSearch._initialized = True
         
     def load_data(self):
         """Load FAISS index, embeddings and image metadata"""
@@ -169,9 +186,135 @@ class CLIPImageSearch:
         except Exception as e:
             print(f"Error in image search: {e}")
             return []
+
+    def update_index_for_image(self, image_id):
+        """Add a new image to the FAISS index"""
+        try:
+            # Get the image from Django ORM
+            from media.models import Image
+            image = Image.objects.get(id=image_id)
+            
+            # Process the image
+            image_url = image.file.url
+            img_response = requests.get(image_url, stream=True)
+            img = Image.open(BytesIO(img_response.content)).convert('RGB')
+            
+            # Generate embedding
+            image_input = self.preprocess(img).unsqueeze(0).to(self.device)
+            with torch.no_grad():
+                image_features = self.model.encode_image(image_input)
+                image_features /= image_features.norm(dim=-1, keepdim=True)
+            
+            # Convert to numpy and reshape
+            embedding = image_features.cpu().numpy().astype('float32').reshape(1, -1)
+            
+            # Add to FAISS index
+            self.faiss_index.add(embedding)
+            
+            # Update metadata
+            self.image_ids.append(image_id)
+            self.image_urls.append(image_url)
+            
+            # Create metadata for this image
+            metadata = {
+                'id': image_id,
+                'file': image_url,
+                'title': image.title,
+                'description': image.description,
+                'created_at': str(image.created_at),
+                'is_public': image.is_public,
+                'user_id': image.user.id
+            }
+            
+            # Add to metadata
+            self.image_metadata.append(metadata)
+            self.metadata_by_id[image_id] = metadata
+            
+            # Save updated data
+            self._save_data()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error updating index for image {image_id}: {e}")
+            raise
+    
+    def remove_from_index(self, image_id):
+        """Remove an image from the FAISS index"""
+        try:
+            # Find the index of the image in our metadata
+            image_index = None
+            for i, img_id in enumerate(self.image_ids):
+                if img_id == image_id:
+                    image_index = i
+                    break
+            
+            if image_index is None:
+                print(f"Image {image_id} not found in index")
+                return False
+                
+            # Remove from metadata
+            self.image_ids.pop(image_index)
+            self.image_urls.pop(image_index)
+            
+            # Remove from metadata dictionary
+            if image_id in self.metadata_by_id:
+                del self.metadata_by_id[image_id]
+            
+            # Find and remove from image_metadata list
+            self.image_metadata = [img for img in self.image_metadata if img['id'] != image_id]
+            
+            # Rebuild FAISS index (since FAISS doesn't support direct removal)
+            # Load embeddings if available
+            embedding_path = os.path.join(INDEX_DIR, 'clip_image_embeddings.npy')
+            if os.path.exists(embedding_path):
+                all_embeddings = np.load(embedding_path)
+                # Remove the embedding for this image
+                all_embeddings = np.delete(all_embeddings, image_index, axis=0)
+                # Save updated embeddings
+                np.save(embedding_path, all_embeddings)
+                
+                # Recreate the index
+                dimension = all_embeddings.shape[1]
+                self.faiss_index = faiss.IndexFlatL2(dimension)
+                self.faiss_index.add(all_embeddings)
+            else:
+                print("Warning: Need to rebuild index completely as embeddings file not found")
+                # This would require regenerating all embeddings
+            
+            # Save updated data
+            self._save_data()
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error removing image {image_id} from index: {e}")
+            raise
+    
+    def _save_data(self):
+        """Save all metadata and index"""
+        try:
+            # Save FAISS index
+            faiss.write_index(self.faiss_index, os.path.join(INDEX_DIR, 'clip_faiss.index'))
+            
+            # Save metadata
+            with open(os.path.join(INDEX_DIR, 'image_urls.json'), 'w') as f:
+                json.dump(self.image_urls, f)
+                
+            with open(os.path.join(INDEX_DIR, 'image_ids.json'), 'w') as f:
+                json.dump(self.image_ids, f)
+                
+            with open(os.path.join(INDEX_DIR, 'image_metadata.json'), 'w') as f:
+                json.dump(self.image_metadata, f)
+                
+            return True
+        except Exception as e:
+            print(f"Error saving data: {e}")
+            raise
+
     # Example usage
 if __name__ == "__main__":
-    search_engine = CLIPImageSearch()
+    search_engine = CLIPImageSearch.get_instance()
     
     # Example text queries
     queries = [
