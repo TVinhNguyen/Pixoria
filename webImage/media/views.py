@@ -235,31 +235,35 @@ class ImageViewSet(viewsets.ModelViewSet):
             liked = LikedImage.objects.filter(user=user_profile, image=image).exists()
             
             if liked:
-                return Response({"status": "already_liked", "likes": image.likes})
+                # Nếu đã like rồi thì bỏ like
+                LikedImage.objects.filter(user=user_profile, image=image).delete()
+                image.likes -= 1
+                image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
+                return Response({"status": "delete like", "likes": image.likes})
+            else:
+                # Tiến hành like ảnh
+                image.likes += 1
+                image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
+
+                # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
+                if image.user != user_profile:
+                    create_notification(
+                        sender_profile=user_profile,
+                        recipient_profile=image.user,
+                        notification_type='like',
+                        content=f"liked your photo '{image.title or 'Untitled'}'"
+                    )
+
+                # Tạo bản ghi like trong database
+                LikedImage.objects.create(user=user_profile, image=image)
                 
-            # Tiến hành like ảnh
-            image.likes += 1
-            image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
-
-            # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
-            if image.user != user_profile:
-                create_notification(
-                    sender_profile=user_profile,
-                    recipient_profile=image.user,
-                    notification_type='like',
-                    content=f"liked your photo '{image.title or 'Untitled'}'"
-                )
-
-            # Tạo bản ghi like trong database
-            LikedImage.objects.create(user=user_profile, image=image)
-            
-            # Trả về cả thông tin ảnh đã cập nhật để frontend có thể cập nhật
-            serializer = self.get_serializer(image)
-            return Response({
-                "status": "success", 
-                "likes": image.likes,
-                "image": serializer.data  # Thêm data ảnh cập nhật
-            })
+                # Trả về cả thông tin ảnh đã cập nhật để frontend có thể cập nhật
+                serializer = self.get_serializer(image)
+                return Response({
+                    "status": "success", 
+                    "likes": image.likes,
+                    "image": serializer.data  # Thêm data ảnh cập nhật
+                })
 
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
