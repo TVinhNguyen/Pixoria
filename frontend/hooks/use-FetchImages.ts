@@ -105,7 +105,7 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
           likes_count: img.likes_count || img.likes || 0,
           downloads_count: img.downloads_count || img.downloads || 0,
           categories: img.categories || [],
-          is_liked: img.is_liked || false,
+          is_liked: img.is_liked,
           is_public: img.is_public
         }));
         

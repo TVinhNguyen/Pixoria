@@ -182,7 +182,7 @@ export async function getUserFollowing(userId: number, page = 1, pageSize = 10) 
     }
 }
 
-export async function getAllFollowers(userId: number) {
+export async function getAllFollowings(userId: number) {
     try {
         const response = await fetch(`${API_BASE_URL}/follows?follower_id=${userId}`, {
             method: "GET",
@@ -194,7 +194,7 @@ export async function getAllFollowers(userId: number) {
         if (response.ok) {
             const data: FollowResponse = await response.json()
             return {
-                followers: data.results.map(item => item.following_details)
+                followings: data.results.map(item => item.following_details)
             }
         }
         return []
@@ -204,7 +204,7 @@ export async function getAllFollowers(userId: number) {
     }
 }
 
-export async function getAllFollowing(userId: number) {
+export async function getAllFollowers(userId: number) {
     try {
         const response = await fetch(`${API_BASE_URL}/follows/?following_id=${userId}`, {
             method: "GET",
@@ -216,7 +216,7 @@ export async function getAllFollowing(userId: number) {
         if (response.ok) {
             const data: FollowResponse = await response.json()
             return {
-                followings: data.results.map(item => item.follower_details)
+                followers: data.results.map(item => item.follower_details)
             }
         }
         return []
