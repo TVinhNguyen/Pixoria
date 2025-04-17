@@ -24,11 +24,14 @@ router.register(r'downloaded-image', DownloadedImageViewSet, basename='downloade
 urlpatterns = [
     path('', include(router.urls)),
 
-    # URL custom: xem bộ sưu tập theo profile, ví dụ:
     path('profile/<str:username>/collections/', 
          CollectionViewSet.as_view({'get': 'list', 'post': 'create'}), 
          name='profile-collections'),
 
+    path('profile/<str:username>/collections/<int:pk>/', 
+        CollectionViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), 
+        name='profile-collection-detail'),
+        
     path('auth/register/', RegisterView.as_view(), name='register'),
     path('api/login/', TokenObtainPairView.as_view(), name='login'),
     

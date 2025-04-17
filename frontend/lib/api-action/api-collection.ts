@@ -73,17 +73,29 @@ export async function handleSaveImageToCollection(collectionId: string, imageId:
     return await patchRes.json()
 }
 
-export async function handleGetCollectionById(collectionId: string) {
-    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}`, {
+export async function handleGetCollectionById(username: string,collectionId: string ) {
+    // Xác định URL dựa trên việc có username hay không
+    let url = '';
+    if (username && username.trim() !== '') {
+        // Nếu có username, sử dụng URL theo profile
+        url = `${API_BASE_URL}/profile/${username}/collections/${collectionId}/`;
+    } else {
+        // Nếu không có username, sử dụng URL mặc định
+        url = `${API_BASE_URL}/collections/${collectionId}/`;
+    }
+
+    const response = await fetch(url, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-    })
+    });
+    
     if (!response.ok) {
-        throw new Error("Failed to fetch collections")
+        throw new Error("Failed to fetch collection details");
     }
-    return await response.json()
+    
+    return await response.json();
 }
 
 export async function handleUpdateCollection(collectionId: string, name: string, description: string, is_public: boolean) {
@@ -105,18 +117,32 @@ export async function handleUpdateCollection(collectionId: string, name: string,
     return await response.json()
 }
 
-export async function loadImagesFromCollection(collectionId: string) {
-    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
+export async function loadImagesFromCollection(username: string, collectionId: string) {
+    // Xác định URL dựa trên việc có username hay không
+
+    let url = '';
+    if (username && username.trim() !== '') {
+        // Nếu có username, sử dụng URL theo profile
+        url = `${API_BASE_URL}/profile/${username}/collections/${collectionId}/`;
+    } else {
+        // Nếu không có username, sử dụng URL mặc định
+        url = `${API_BASE_URL}/collections/${collectionId}/`;
+    }
+
+    const response = await fetch(url, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
-    })
+    });
+    
     if (!response.ok) {
-        throw new Error("Failed to delete collection")
+        throw new Error("Failed to fetch collection details");
     }
-    const data = await response.json()
-    const imageIds = data.images
+    
+    const data = await response.json();
+    const imageIds = data.images;
+    
     const imageDetails = await Promise.all(
         imageIds.map(async (imageId: number) => {
             const imageResponse = await fetch(`${API_BASE_URL}/images/${imageId}/?public=true`, {
@@ -124,12 +150,13 @@ export async function loadImagesFromCollection(collectionId: string) {
                 headers: {
                     Authorization: `Bearer ${localStorage.getItem("token")}`,
                 },
-            })
+            });
             if (!imageResponse.ok) {
-                throw new Error("Failed to fetch image details")
+                throw new Error("Failed to fetch image details");
             }
-            return await imageResponse.json()
+            return await imageResponse.json();
         })
-    )
-    return imageDetails
+    );
+    
+    return imageDetails;
 }
