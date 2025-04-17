@@ -13,7 +13,6 @@ import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import CollectionModal from "./modal/collection-modal"
 import ToastNotification from "./modal/message-modal"
-import { set } from "date-fns"
 
 interface ImageGridProps {
   imagesPerPage: number
@@ -35,9 +34,14 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
   // chỗ này được dùng để set mấy cái toast
   const [toastOpen, setToastOpen] = useState(false)
   const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
-  const [toastMessage, setToastMessage] = useState({title: "", description: "", duration: 0})
+  const [toastMessage, setToastMessage] = useState({ title: "", description: "", duration: 0 })
 
-  const setNotification = (variant: "success" | "error" | "info" | "warning", title: string, description: string, duration: number) => {
+  const setNotification = (
+    variant: "success" | "error" | "info" | "warning",
+    title: string,
+    description: string,
+    duration: number,
+  ) => {
     setToastVariant(variant)
     setToastMessage({ title, description, duration })
     setToastOpen(true)
@@ -101,18 +105,39 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
   // Xử lý like và download
   const handleImageLike = async (imageId: number) => {
     try {
+      // Find the current image
+      const currentImage = displayedImages.find((img) => img.id === imageId)
+
+      // If the image is already liked, we want to unlike it
+      const isUnliking = currentImage?.is_liked
+
       const response = await handleLike(imageId)
 
-      // Cập nhật state local nếu like thành công
-      if (response && (response.status === "success" || response.likes)) {
+      if (response && (response.status === "success" || response.likes !== undefined)) {
         setDisplayedImages((prevImages) =>
-          prevImages.map((img) => (img.id === imageId ? { ...img, likes: response.likes, is_liked: true } : img)),
+          prevImages.map((img) =>
+            img.id === imageId
+              ? {
+                  ...img,
+                  likes: response.likes,
+                  is_liked: isUnliking ? false : true,
+                }
+              : img,
+          ),
         )
+
+        // Show appropriate toast message
+        if (isUnliking) {
+          setNotification("info", "Unliked", "You've removed your like from this image", 2000)
+        } else {
+          setNotification("success", "Liked", "You've liked this image!", 2000)
+        }
       } else if (response && response.status === "already_liked") {
-        toast.info("Bạn đã thích ảnh này rồi!")
+        toast.info("You've already liked this image!")
       }
     } catch (error) {
-      console.error("Lỗi khi thích ảnh:", error)
+      console.error("Error when liking/unliking image:", error)
+      setNotification("error", "Error", "Failed to update like status. Please try again!", 3000)
     }
   }
 
@@ -120,7 +145,7 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
     try {
       const apiResponse = await handleDownload(imageId)
       const header = new Headers({ "Access-Control-Allow-Origin": "*" })
-      const response = await fetch(imageSrc, {headers: header})
+      const response = await fetch(imageSrc, { headers: header })
       const blob = await response.blob()
       const blobUrl = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -321,4 +346,3 @@ export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridPro
     </section>
   )
 }
-

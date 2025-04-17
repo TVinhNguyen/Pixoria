@@ -12,7 +12,7 @@ import {
   loadAllLikedImages,
   loadAllDownloadedImages,
 } from "@/lib/api-action/api-profile"
-import { getAllFollowers, getAllFollowing } from "@/lib/api-action/api-follow"
+import { getAllFollowers, getAllFollowings } from "@/lib/api-action/api-follow"
 import { handleGetCollections } from "@/lib/api-action/api-collection"
 import ProfileEditModal from "@/components/modal/edit-profile-modal"
 import EditCollectionModal from "@/components/modal/collections/edit-collection-modal"
@@ -198,7 +198,7 @@ export default function Profile() {
 
   const fetchFollowing = async () => {
     try {
-      const mockFollowing = await getAllFollowing(Number(localStorage.getItem("user_id")))
+      const mockFollowing = await getAllFollowings(Number(localStorage.getItem("user_id")))
       const followingArray = !Array.isArray(mockFollowing) && Array.isArray(mockFollowing.followings) ? mockFollowing.followings : []
       setFollowingList(followingArray)
     } catch (error) {
