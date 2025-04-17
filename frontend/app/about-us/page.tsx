@@ -7,7 +7,7 @@ export default function AboutPage() {
     <div className="min-h-screen flex flex-col">
       <Header />
 
-      <div className="relative w-full h-[400px] md:h-[500px] mt-16 ">
+      <div className="relative w-full h-[400px] md:h-[300px] mt-16 ">
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col items-center justify-center text-white text-center px-4 pt-32 pb-20 px-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-900 dark:to-gray-800">
           <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text max-w-4xl mx-auto leading-normal pb-1">Unleash Creativity</h1>
           <p className="text-xl mb-8 text-gray-600 dark:text-gray-300">
