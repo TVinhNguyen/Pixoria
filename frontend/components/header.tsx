@@ -81,10 +81,10 @@ export default function Header() {
           </Link>
           <nav className="hidden md:flex items-center space-x-6">
             <Link
-              href="/explore"
+              href="/about-us"
               className="text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white transition-colors"
             >
-              Explore
+              About us
             </Link>
             <Link
               href="/license"

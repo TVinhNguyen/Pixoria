@@ -8,12 +8,7 @@ from io import BytesIO
 
 class FeatureExtractor:
     def __init__(self, use_gpu=True):
-        """
-        Khởi tạo Feature Extractor sử dụng mô hình ResNet50 pre-trained.
-        
-        Args:
-            use_gpu (bool): Sử dụng GPU nếu có.
-        """
+ 
         self.device = torch.device("cuda" if torch.cuda.is_available() and use_gpu else "cpu")
         print(f"Using device: {self.device}")
 

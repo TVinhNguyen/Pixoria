@@ -1,6 +1,6 @@
 "use client"
 
-import { X, LogOut, Settings, User, Heart, Bookmark } from "lucide-react"
+import { X, LogOut, Settings, User, Heart, Bookmark, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import Image from "next/image"
@@ -78,22 +78,28 @@ export default function ProfileModal({ isOpen, onClose, data }: ProfileModalProp
           </div>
 
           <div className="w-full space-y-2">
-            <Link href="/profile">
+            <Link href="/profile?tab=photos">
               <Button variant="outline" className="w-full justify-start">
                 <User className="mr-2 h-4 w-4" />
                 View Profile
               </Button>
             </Link>
-            <Link href="/saved">
-              <Button variant="outline" className="w-full justify-start">
-                <Heart className="mr-2 h-4 w-4" />
-                Liked Photos
-              </Button>
-            </Link>
-            <Link href="/collections">
+            <Link href="/profile?tab=collections">
               <Button variant="outline" className="w-full justify-start">
                 <Bookmark className="mr-2 h-4 w-4" />
                 Collections
+              </Button>
+            </Link>
+            <Link href="/profile?tab=likes">
+              <Button variant="outline" className="w-full justify-start">
+                <Heart className="mr-2 h-4 w-4" />
+                Likes
+              </Button>
+            </Link>
+            <Link href="/profile?tab=downloads">
+              <Button variant="outline" className="w-full justify-start">
+                <Download className="mr-2 h-4 w-4" />
+                Downloads
               </Button>
             </Link>
             <Link href="/settings">

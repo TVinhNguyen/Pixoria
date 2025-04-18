@@ -1,185 +1,188 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import useFetchImages from "../hooks/use-FetchImages";
+import useFetchImages, { type ImageData } from "../hooks/use-FetchImages"
+import { handleLike, handleDownload } from "@/lib/api-action/image-actions"
 import Image from "next/image"
+import Link from "next/link"
 import Masonry from "react-masonry-css"
-import { Download, Heart, Share2 } from "lucide-react"
+import { Download, Heart, Share2, FolderPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
-
-interface ImageData {
-  id: number
-  src: string
-  alt: string
-  width: number
-  height: number
-  title?: string
-  description?: string
-  created_at?: string
-  likes?: number
-  downloads?: number
-}
+import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import CollectionModal from "./modal/collection-modal"
+import ToastNotification from "./modal/message-modal"
 
 interface ImageGridProps {
-  paginationType: "traditional" | "infinite"
   imagesPerPage: number
-  searchResults?: ImageData[]; 
+  searchResults?: ImageData[]
 }
 
-export default function ImageGrid({ paginationType, imagesPerPage, searchResults }: ImageGridProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [displayedImages, setDisplayedImages] = useState<ImageData[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const observer = useRef<IntersectionObserver | null>(null);
-  
-  // Theo dõi xem có đang sử dụng kết quả tìm kiếm hay không
-  const [isUsingSearchResults, setIsUsingSearchResults] = useState(false);
-  
-  // Chỉ fetch dữ liệu khi không có kết quả tìm kiếm
-  const { images: fetchedImages, totalPages, isLoading } = useFetchImages(
-    (!searchResults || searchResults.length === 0) ? currentPage : 1, 
-    imagesPerPage
-  );
+export default function ImageGrid({ imagesPerPage, searchResults }: ImageGridProps) {
+  // State không thay đổi
+  const [currentPage, setCurrentPage] = useState(1)
+  const [displayedImages, setDisplayedImages] = useState<ImageData[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const [isUsingSearchResults, setIsUsingSearchResults] = useState(false)
+  const observer = useRef<IntersectionObserver | null>(null)
 
-  // Xử lý khi searchResults thay đổi
-  useEffect(() => {
-    if (searchResults && searchResults.length > 0) {
-      console.log("Using search results:", searchResults);
-      setDisplayedImages(searchResults);
-      setIsUsingSearchResults(true);
-      setHasMore(false); // Không cần phân trang với kết quả tìm kiếm
-    } else {
-      setIsUsingSearchResults(false);
-    }
-  }, [searchResults]);
+  // State cho modal bộ sưu tập
+  const [collectionModalOpen, setCollectionModalOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<ImageData | null>(null)
 
-  // Xử lý khi fetchedImages thay đổi (chỉ khi không dùng searchResults)
-  useEffect(() => {
-    // Chỉ cập nhật từ fetchedImages khi không dùng kết quả tìm kiếm
-    if (!isUsingSearchResults && !isLoading && fetchedImages && fetchedImages.length > 0) {
-      console.log("Using fetched images:", fetchedImages);
-      
-      if (paginationType === "infinite") {
-        // For infinite scroll, append new images
-        setDisplayedImages((prev) => {
-          // Tránh trùng lặp dựa trên ID
-          const existingIds = new Set(prev.map(img => img.id));
-          const newImages = fetchedImages.filter(img => !existingIds.has(img.id));
-          return [...prev, ...newImages];
-        });
-      } else {
-        // For traditional pagination, replace images
-        setDisplayedImages(fetchedImages);
-      }
-      
-      // Check if we've reached the end
-      setHasMore(currentPage < totalPages);
-    }
-  }, [fetchedImages, currentPage, totalPages, paginationType, isLoading, isUsingSearchResults]);
+  // chỗ này được dùng để set mấy cái toast
+  const [toastOpen, setToastOpen] = useState(false)
+  const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
+  const [toastMessage, setToastMessage] = useState({ title: "", description: "", duration: 0 })
 
-  // Log để debug
-  useEffect(() => {
-    console.log("Is using search results:", isUsingSearchResults);
-    console.log("Images from hook:", fetchedImages);
-    console.log("Search results:", searchResults);
-    console.log("Current displayed images:", displayedImages);
-  }, [fetchedImages, displayedImages, searchResults, isUsingSearchResults]);
-
-  // Reference for the last image element for infinite scroll
-  const lastImageElementRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      if (isLoading || isUsingSearchResults) return; // Không áp dụng infinite scroll cho kết quả tìm kiếm
-      if (observer.current) observer.current.disconnect();
-
-      observer.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore && paginationType === "infinite") {
-          setCurrentPage((prevPage) => prevPage + 1);
-        }
-      });
-
-      if (node) observer.current.observe(node);
-    },
-    [isLoading, hasMore, paginationType, isUsingSearchResults],
-  );
-
-  // Reset images and page when pagination type changes or khi chuyển từ search results sang normal browsing
-  useEffect(() => {
-    if (!isUsingSearchResults) {
-      setDisplayedImages([]);
-      setCurrentPage(1);
-    }
-  }, [paginationType, isUsingSearchResults]);
-
-  const handlePageChange = (page: number) => {
-    // Scroll to top when changing pages
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setCurrentPage(page);
+  const setNotification = (
+    variant: "success" | "error" | "info" | "warning",
+    title: string,
+    description: string,
+    duration: number,
+  ) => {
+    setToastVariant(variant)
+    setToastMessage({ title, description, duration })
+    setToastOpen(true)
   }
 
-  // Generate an array of page numbers to display
-  const getPageNumbers = () => {
-    const pageNumbers = [];
-    const maxPagesToShow = 5;
+  // Hook fetch ảnh
+  const {
+    images: fetchedImages,
+    totalPages,
+    isLoading,
+  } = useFetchImages(!searchResults || searchResults.length === 0 ? currentPage : 1, imagesPerPage)
 
-    if (totalPages <= maxPagesToShow) {
-      // If we have fewer pages than the max to show, display all pages
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i);
-      }
+  // useEffect cho kết quả tìm kiếm
+  useEffect(() => {
+    if (searchResults && searchResults.length > 0) {
+      setDisplayedImages(searchResults)
+      setIsUsingSearchResults(true)
+      setHasMore(false)
     } else {
-      // Always include first page
-      pageNumbers.push(1);
-
-      // Calculate start and end of page range to show
-      let startPage = Math.max(2, currentPage - 1);
-      let endPage = Math.min(totalPages - 1, currentPage + 1);
-
-      // Adjust if we're near the beginning
-      if (currentPage <= 3) {
-        endPage = 4;
-      }
-
-      // Adjust if we're near the end
-      if (currentPage >= totalPages - 2) {
-        startPage = totalPages - 3;
-      }
-
-      // Add ellipsis after first page if needed
-      if (startPage > 2) {
-        pageNumbers.push("...");
-      }
-
-      // Add the page range
-      for (let i = startPage; i <= endPage; i++) {
-        pageNumbers.push(i);
-      }
-
-      // Add ellipsis before last page if needed
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...");
-      }
-
-      // Always include last page
-      pageNumbers.push(totalPages);
+      setIsUsingSearchResults(false)
     }
+  }, [searchResults])
 
-    return pageNumbers;
+  // useEffect cho việc fetch ảnh thông thường
+  useEffect(() => {
+    if (!isUsingSearchResults && !isLoading && fetchedImages.length > 0) {
+      setDisplayedImages((prev) => {
+        const existingIds = new Set(prev.map((img) => img.id))
+        const newImages = fetchedImages.filter((img) => !existingIds.has(img.id))
+        return [...prev, ...newImages]
+      })
+      setHasMore(currentPage < totalPages)
+    }
+  }, [fetchedImages, currentPage, totalPages, isLoading, isUsingSearchResults])
+
+  // Observer cho infinite scrolling
+  const lastImageElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (isLoading || isUsingSearchResults) return
+      if (observer.current) observer.current.disconnect()
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setCurrentPage((prev) => prev + 1)
+        }
+      })
+
+      if (node) observer.current.observe(node)
+    },
+    [isLoading, hasMore, isUsingSearchResults],
+  )
+
+  // Reset khi chuyển chế độ
+  useEffect(() => {
+    if (!isUsingSearchResults) {
+      setDisplayedImages([])
+      setCurrentPage(1)
+    }
+  }, [isUsingSearchResults])
+
+  // Xử lý like và download
+  const handleImageLike = async (imageId: number) => {
+    try {
+      // Find the current image
+      const currentImage = displayedImages.find((img) => img.id === imageId)
+
+      // If the image is already liked, we want to unlike it
+      const isUnliking = currentImage?.is_liked
+
+      const response = await handleLike(imageId)
+
+      if (response && (response.status === "success" || response.likes !== undefined)) {
+        setDisplayedImages((prevImages) =>
+          prevImages.map((img) =>
+            img.id === imageId
+              ? {
+                  ...img,
+                  likes: response.likes,
+                  is_liked: isUnliking ? false : true,
+                }
+              : img,
+          ),
+        )
+
+        // Show appropriate toast message
+        if (isUnliking) {
+          setNotification("info", "Unliked", "You've removed your like from this image", 2000)
+        } else {
+          setNotification("success", "Liked", "You've liked this image!", 2000)
+        }
+      } else if (response && response.status === "already_liked") {
+        toast.info("You've already liked this image!")
+      }
+    } catch (error) {
+      console.error("Error when liking/unliking image:", error)
+      setNotification("error", "Error", "Failed to update like status. Please try again!", 3000)
+    }
+  }
+
+  const handleImageDownload = async (imageId: number, imageSrc: string) => {
+    try {
+      const apiResponse = await handleDownload(imageId)
+      const header = new Headers({ "Access-Control-Allow-Origin": "*" })
+      const response = await fetch(imageSrc, { headers: header })
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = blobUrl
+      link.download = `image-${imageId}.jpg`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(blobUrl)
+      if (apiResponse && (apiResponse.status === "success" || apiResponse.downloads)) {
+        setDisplayedImages((prevImages) =>
+          prevImages.map((img) => (img.id === imageId ? { ...img, downloads: apiResponse.downloads } : img)),
+        )
+      }
+      setNotification("success", "Success", "Image is downloaded successfully!", 3000)
+    } catch (error) {
+      console.error("Lỗi khi tải ảnh:", error)
+      setNotification("error", "Error", "Failed to download the image. Please try again!", 3000)
+    }
+  }
+
+  // Xử lý thêm vào bộ sưu tập
+  const handleAddToCollection = (image: ImageData) => {
+    setSelectedImage(image)
+    setCollectionModalOpen(true)
+  }
+
+  const handleShare = (imageSrc: string) => {
+    navigator.clipboard.writeText(window.location.origin + imageSrc)
+    setNotification("success", "Success", "Image's link is saved to clipboard!", 3000)
   }
 
   return (
     <section className="py-12 px-4">
       <div className="container mx-auto">
-        {/* Loading skeleton for traditional pagination or initial load */}
-        {isLoading && !isUsingSearchResults && paginationType === "traditional" && (
+        {/* Loading skeleton trong lần fetch đầu tiên */}
+        {isLoading && !isUsingSearchResults && displayedImages.length === 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {Array.from({ length: imagesPerPage }).map((_, index) => (
               <div key={index} className="mb-4">
@@ -202,9 +205,20 @@ export default function ImageGrid({ paginationType, imagesPerPage, searchResults
             columnClassName="bg-clip-padding px-2"
           >
             {displayedImages.map((image, index) => {
-              // For the last item in infinite scroll, add a ref
-              const isLastElement = index === displayedImages.length - 1;
-              
+              const isLastElement = index === displayedImages.length - 1
+
+              const imageSrc = image.file || image.src || ""
+
+              const author = image.author || {
+                user_id: 0,
+                username: image.username || "photographer",
+                name: "Photographer",
+                avatar: null,
+              }
+
+              // Tạo chữ cái đầu cho avatar fallback
+              const avatarInitial = author.name ? author.name.charAt(0).toUpperCase() : "P"
+
               return (
                 <div
                   key={`${image.id}-${index}`}
@@ -213,109 +227,121 @@ export default function ImageGrid({ paginationType, imagesPerPage, searchResults
                 >
                   <div className="aspect-auto rounded-lg overflow-hidden">
                     <Image
-                      src={image.src}
+                      src={imageSrc || "/placeholder.svg"}
                       width={500}
                       height={500}
                       alt={image.alt || image.title || "Image"}
-                      className="rounded-lg shadow-md transition-shadow duration-300 w-full h-auto object-cover"
+                      className="rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 w-full h-auto object-cover"
                       loading="lazy"
                       onError={(e) => {
-                        console.error("Image loading failed:", image.src);
-                        // Fallback to placeholder on error
-                        (e.target as HTMLImageElement).src = "/placeholder.svg";
+                        console.error("Image loading failed:", imageSrc)
+                        ;(e.target as HTMLImageElement).src = "/placeholder.svg"
                       }}
                     />
                   </div>
-                  <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg flex items-center justify-center overflow-hidden">
-                    <div className="flex space-x-2">
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+
+                  {/* Overlay với gradient và hiệu ứng mượt mà */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-lg flex flex-col justify-between p-4">
+                    {/* Phần trên - các nút tương tác */}
+                    <div className="self-end flex space-x-2 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-150">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
+                        onClick={() => handleImageDownload(image.id, imageSrc)}
+                      >
                         <Download className="h-5 w-5" />
+                        {image.downloads > 0 && (
+                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                            {image.downloads > 99 ? "99+" : image.downloads}
+                          </span>
+                        )}
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
-                        <Heart className="h-5 w-5" />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
+                        onClick={() => handleImageLike(image.id)}
+                      >
+                        <Heart className={`h-5 w-5 ${image.is_liked ? "fill-red-500 text-red-500" : ""}`} />
+                        {image.likes > 0 && (
+                          <span className="absolute -bottom-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+                            {image.likes > 99 ? "99+" : image.likes}
+                          </span>
+                        )}
                       </Button>
-                      <Button size="icon" variant="ghost" className="text-white hover:text-gray-200">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
+                        onClick={() => handleAddToCollection(image)}
+                      >
+                        <FolderPlus className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-white hover:text-gray-200 hover:bg-black/20 backdrop-blur-sm"
+                        onClick={() => handleShare(imageSrc)}
+                      >
                         <Share2 className="h-5 w-5" />
                       </Button>
                     </div>
+
+                    {/* Phần dưới - thông tin tác giả */}
+                    <Link
+                      href={`/profile/${author.username}`}
+                      className="flex items-center space-x-3 translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 delay-150 hover:bg-black/20 p-2 rounded-lg backdrop-blur-sm"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Avatar className="h-8 w-8 border-2 border-white/50">
+                        <AvatarImage src={author.avatar || "/default-avatar.png"} alt={author.name} />
+                        <AvatarFallback className="bg-purple-600 text-white text-xs">{avatarInitial}</AvatarFallback>
+                      </Avatar>
+                      <div className="text-white">
+                        <h4 className="text-sm font-medium leading-none">{author.name}</h4>
+                        {author.username && <p className="text-xs text-gray-300">@{author.username}</p>}
+                      </div>
+                    </Link>
                   </div>
-                  
-                  {/* Optional: Show image details */}
-                  {image.title && (
-                    <div className="mt-2">
-                      <h3 className="text-sm font-medium">{image.title}</h3>
-                      {image.description && <p className="text-xs text-gray-500">{image.description}</p>}
-                    </div>
-                  )}
                 </div>
               )
             })}
           </Masonry>
         )}
 
-        {/* No images found */}
+        {/* Không có ảnh */}
         {!isLoading && displayedImages.length === 0 && (
           <div className="text-center py-10">
             <p className="text-lg text-gray-600">Không tìm thấy hình ảnh nào.</p>
           </div>
         )}
 
-        {/* Loading indicator for infinite scroll */}
-        {isLoading && !isUsingSearchResults && paginationType === "infinite" && (
+        {/* Loading spinner cho infinite scroll */}
+        {isLoading && !isUsingSearchResults && displayedImages.length > 0 && (
           <div className="flex justify-center my-8">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
 
-        {/* Pagination Controls - Only show for traditional pagination and not search results */}
-        {!isUsingSearchResults && paginationType === "traditional" && totalPages > 1 && (
-          <div className="mt-12">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (currentPage > 1) handlePageChange(currentPage - 1)
-                    }}
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-
-                {getPageNumbers().map((page, index) => (
-                  <PaginationItem key={index}>
-                    {page === "..." ? (
-                      <span className="px-4 py-2">...</span>
-                    ) : (
-                      <PaginationLink
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          handlePageChange(page as number)
-                        }}
-                        isActive={currentPage === page}
-                      >
-                        {page}
-                      </PaginationLink>
-                    )}
-                  </PaginationItem>
-                ))}
-
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      if (currentPage < totalPages) handlePageChange(currentPage + 1)
-                    }}
-                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
+        {/* Collection Modal Component */}
+        {selectedImage && (
+          <CollectionModal
+            isOpen={collectionModalOpen}
+            onClose={() => setCollectionModalOpen(false)}
+            imageId={selectedImage.id}
+            imageUrl={selectedImage.file || selectedImage.src}
+          />
         )}
+
+        <ToastNotification
+          variant={toastVariant}
+          title={toastMessage.title}
+          description={toastMessage.description}
+          isOpen={toastOpen}
+          onClose={() => setToastOpen(false)}
+          duration={toastMessage.duration}
+        />
       </div>
     </section>
   )

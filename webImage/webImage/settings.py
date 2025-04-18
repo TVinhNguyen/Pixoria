@@ -8,6 +8,7 @@ import dj_database_url
 load_dotenv()
 
 # Base directory
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key (Không dùng key này trong production!)
@@ -18,6 +19,30 @@ DEBUG = True
 
 # Allowed hosts (Thêm domain khi deploy)
 ALLOWED_HOSTS = ['*']
+
+# Redis Configuration
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
+REDIS_DB = os.getenv('REDIS_DB', '0')
+
+# Cache settings with Redis
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Chỉ sử dụng password nếu nó thực sự được cung cấp và không phải là chuỗi rỗng
+            **({"PASSWORD": REDIS_PASSWORD} if REDIS_PASSWORD else {})
+        },
+        "KEY_PREFIX": "pixoria"
+    }
+}
+
+# Session with Redis
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
 
 # Installed apps
 INSTALLED_APPS = [
@@ -35,7 +60,8 @@ INSTALLED_APPS = [
     'corsheaders',
     # Local apps
     'media',
-    'imageretrieval'
+    'imageretrieval',
+    # 'clip',
     # For request to server (pip install django-cors-headers)
     
 
@@ -52,6 +78,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Rate limiting middleware
+    'media.middleware.RateLimitMiddleware',
 ]
 
 # Allow frontend to fetch data from backend
@@ -119,19 +147,6 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Django REST Framework settings
-# REST_FRAMEWORK = {
-#     'DEFAULT_AUTHENTICATION_CLASSES': (
-#         'rest_framework.authentication.SessionAuthentication',  # Thêm dòng này để hiển thị nút Login
-#         'rest_framework_simplejwt.authentication.JWTAuthentication',
-#         'rest_framework.authentication.TokenAuthentication'
-#     ),
-#     'DEFAULT_PERMISSION_CLASSES': (
-#         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-#     ),
-#     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',  # Đổi từ PageNumberPagination
-#     'PAGE_SIZE': 12,
-# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -147,7 +162,10 @@ REST_FRAMEWORK = {
 }
 
 
-
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+MEDIA_URL = '/mediafiles/'
+INDEX_DIR = MEDIA_ROOT / "image_index"
+INDEX_CLIP_DIR = MEDIA_ROOT / "clip_index"
 # Simple JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),

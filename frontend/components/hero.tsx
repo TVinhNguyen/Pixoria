@@ -8,9 +8,9 @@ import Image from "next/image"
 import { Download, Heart, Share2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Masonry from "react-masonry-css"
+import SliderGallery from "./SliderGallery"
 import { searchByImage, searchByText, searchByImageUrl, VisualSearchResult } from "@/lib/api-action/visual-search"
 
-// Định nghĩa kiểu dữ liệu cho kết quả tìm kiếm
 interface ImageData {
   id: number
   src: string
@@ -33,7 +33,53 @@ export default function Hero() {
   const [hasSearched, setHasSearched] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dropZoneRef = useRef<HTMLDivElement>(null)
-
+  const [featuredImages, setFeaturedImages] = useState<ImageData[]>([
+    {
+      id: 1,
+      src: "images/nature.jpg",
+      alt: "Beautiful natural scenery",
+      width: 1920,
+      height: 1080,
+      title: "Explore the beauty of nature",
+      description: "Looking for landscape images with unique perspectives and vibrant colors."
+    },
+    {
+      id: 2,
+      src: "images/workspace.jpg",
+      alt: "Creative workspace",
+      width: 1920,
+      height: 1080,
+      title: "Creative workspace",
+      description: "Photos of modern and creative workspaces to inspire."
+    },
+    {
+      id: 3,
+      src: "images/city.jpg",
+      alt: "Modern cityscape",
+      width: 1920,
+      height: 1080,
+      title: "Explore modern cityscapes",
+      description: "Unique perspectives on urban life and modern architecture."
+    },
+    {
+      id: 4,
+      src: "images/portrait.jpg",
+      alt: "Artistic portrait",
+      width: 1920,
+      height: 1080,
+      title: "Artistic portrait photography",
+      description: "Impressive portrait collection with creative and emotional approach."
+    },
+    {
+      id: 5,
+      src: "images/food.jpg",
+      alt: "Creative cuisine",
+      width: 1920,
+      height: 1080,
+      title: "Explore creative cuisine",
+      description: "Beautiful and attractive food pictures from around the world."
+    }
+  ])
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSearching(true)
@@ -100,17 +146,14 @@ export default function Hero() {
   }
 
   const clearUploadedImage = () => {
-    // Xóa ảnh đã upload
     setUploadedImage(null);
     setUploadedFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     
-    // Xóa kết quả tìm kiếm khi xóa ảnh đã upload
     if (searchResults.length > 0) {
       setSearchResults([]);
-      // Tùy chọn: thông báo đã xóa kết quả tìm kiếm
       console.log("Đã xóa kết quả tìm kiếm liên quan");
       
       // Nếu bạn muốn giữ lại flag hasSearched là true, hãy comment dòng dưới đây
@@ -165,9 +208,11 @@ export default function Hero() {
         ref={dropZoneRef}
       >
         <div className="container mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text">
-            Discover the perfect image
+          <h1 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text max-w-4xl mx-auto leading-normal pb-1">
+          Discover the perfect image
           </h1>
+
+
           <p className="text-xl mb-8 text-gray-600 dark:text-gray-300">
             Free high-resolution photos you can use anywhere
           </p>
@@ -252,6 +297,11 @@ export default function Hero() {
         </div>
       </section>
 
+      {!hasSearched && (
+        <div className="container mx-auto py-8 px-4">
+          <SliderGallery images={featuredImages} />
+        </div>
+      )}
       {/* Hiển thị kết quả tìm kiếm - trực tiếp trong Hero thay vì dùng ImageGrid */}
       {hasSearched && (
         <div className="bg-gray-50 dark:bg-gray-900">
@@ -316,14 +366,6 @@ export default function Hero() {
                         </Button>
                       </div>
                     </div>
-                    
-                    {/* Optional: Show image details */}
-                    {image.title && (
-                      <div className="mt-2">
-                        <h3 className="text-sm font-medium">{image.title}</h3>
-                        {image.description && <p className="text-xs text-gray-500">{image.description}</p>}
-                      </div>
-                    )}
                   </div>
                 ))}
               </Masonry>
