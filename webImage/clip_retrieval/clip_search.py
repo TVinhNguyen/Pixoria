@@ -9,6 +9,8 @@ from io import BytesIO
 import os
 import django
 import sys
+import pickle
+from django.core.cache import cache
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -19,6 +21,8 @@ from django.conf import settings
 INDEX_DIR = settings.INDEX_CLIP_DIR
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 
+# Thời gian cache mặc định (24 giờ)
+DEFAULT_CACHE_TTL = 60 * 60 * 24
 
 # Define the index directory
 
@@ -143,8 +147,16 @@ class CLIPImageSearch:
             print(f"Error synchronizing data: {e}")
             return False
     
-    def search(self, query_text, top_k=12):
-        """Search images using a text query with FAISS"""
+    def search(self, query_text, top_k=12, use_cache=True):
+        """Search images using a text query with FAISS with Redis caching"""
+        # Kiểm tra cache nếu use_cache=True
+        if use_cache:
+            cache_key = f'clip_text_search:{query_text}:{top_k}'
+            cached_results = cache.get(cache_key)
+            if cached_results:
+                print(f"Returning cached results for query: '{query_text}'")
+                return cached_results
+        
         # Encode the query text
         with torch.no_grad():
             text = clip.tokenize([query_text]).to(self.device)
@@ -187,11 +199,25 @@ class CLIPImageSearch:
         # Sort by similarity score (highest first)
         results.sort(key=lambda x: x['similarity_score'], reverse=True)
         
+        # Cache kết quả nếu use_cache=True
+        if use_cache:
+            # Serialize để cache (nếu cần thiết)
+            cache_key = f'clip_text_search:{query_text}:{top_k}'
+            cache.set(cache_key, results, DEFAULT_CACHE_TTL)
+        
         return results
 
-    def search_by_image(self, image_path_or_url, top_k=12):
-        """Search similar images using an image URL or local file path"""
+    def search_by_image(self, image_path_or_url, top_k=12, use_cache=True):
+        """Search similar images using an image URL or local file path with Redis caching"""
         try:
+            # Kiểm tra cache nếu sử dụng URL và use_cache=True
+            if use_cache and image_path_or_url.startswith('http'):
+                cache_key = f'clip_image_search:{image_path_or_url}:{top_k}'
+                cached_results = cache.get(cache_key)
+                if cached_results:
+                    print(f"Returning cached results for image search: '{image_path_or_url}'")
+                    return cached_results
+            
             # Phân biệt URL và local path
             if os.path.exists(image_path_or_url):
                 # Nếu là file local
@@ -238,11 +264,46 @@ class CLIPImageSearch:
 
             # Sort by similarity score (highest first)
             results.sort(key=lambda x: x['similarity_score'], reverse=True)
+            
+            # Cache kết quả nếu sử dụng URL và use_cache=True
+            if use_cache and image_path_or_url.startswith('http'):
+                cache_key = f'clip_image_search:{image_path_or_url}:{top_k}'
+                cache.set(cache_key, results, DEFAULT_CACHE_TTL)
 
             return results
 
         except Exception as e:
             print(f"Error in image search: {e}")
+            return []
+
+    def search_by_image_id(self, image_id, top_k=12, use_cache=True):
+        """Search similar images using an image ID with Redis caching"""
+        try:
+            # Kiểm tra cache nếu use_cache=True
+            if use_cache:
+                cache_key = f'clip_image_id_search:{image_id}:{top_k}'
+                cached_results = cache.get(cache_key)
+                if cached_results:
+                    print(f"Returning cached results for image ID search: '{image_id}'")
+                    return cached_results
+            
+            # Truy vấn Django database để lấy ảnh
+            from media.models import Image
+            image = Image.objects.get(id=image_id)
+            image_url = image.file.url
+            
+            # Tiến hành tìm kiếm thông qua URL
+            results = self.search_by_image(image_url, top_k, use_cache=False)
+            
+            # Cache kết quả nếu use_cache=True
+            if use_cache:
+                cache_key = f'clip_image_id_search:{image_id}:{top_k}'
+                cache.set(cache_key, results, DEFAULT_CACHE_TTL)
+            
+            return results
+            
+        except Exception as e:
+            print(f"Error in image ID search: {e}")
             return []
 
     def update_index_for_image(self, image_id):
@@ -287,6 +348,9 @@ class CLIPImageSearch:
             # Add to metadata
             self.image_metadata.append(metadata)
             self.metadata_by_id[image_id] = metadata
+            
+            # Xóa cache liên quan đến tìm kiếm để đảm bảo kết quả luôn mới nhất
+            self._invalidate_search_cache()
             
             # Save updated data
             self._save_data()
@@ -356,6 +420,9 @@ class CLIPImageSearch:
                 print("Warning: Need to rebuild index completely as embeddings file not found")
                 # Try to rebuild the index from what we have
                 self._rebuild_index_from_metadata()
+            
+            # Xóa cache liên quan đến tìm kiếm để đảm bảo kết quả luôn mới nhất
+            self._invalidate_search_cache()
             
             # Save updated data
             self._save_data()
@@ -450,6 +517,27 @@ class CLIPImageSearch:
         except Exception as e:
             print(f"Error saving data: {e}")
             raise
+    
+    def _invalidate_search_cache(self):
+        """Xóa toàn bộ cache liên quan đến tìm kiếm"""
+        try:
+            # Sử dụng wildcard để xóa tất cả cache liên quan đến tìm kiếm
+            # Lưu ý: Điều này phụ thuộc vào cơ chế hỗ trợ wildcard delete của Redis
+            from django.core.cache import cache
+            
+            # Xóa cache tìm kiếm theo text
+            cache.delete_pattern("pixoria:clip_text_search:*")
+            
+            # Xóa cache tìm kiếm theo image
+            cache.delete_pattern("pixoria:clip_image_search:*")
+            
+            # Xóa cache tìm kiếm theo image ID
+            cache.delete_pattern("pixoria:clip_image_id_search:*")
+            
+            print("Đã xóa cache tìm kiếm")
+        except Exception as e:
+            print(f"Lỗi khi xóa cache tìm kiếm: {e}")
+            # Tiếp tục ngay cả khi có lỗi xảy ra
 
     # Example usage
 if __name__ == "__main__":
