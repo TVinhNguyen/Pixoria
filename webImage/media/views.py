@@ -285,6 +285,13 @@ class ImageViewSet(viewsets.ModelViewSet):
     def like_image(self, request, pk=None):
         """API endpoint để like ảnh, tự động xác định loại ảnh"""
         try:
+            # Kiểm tra trực tiếp xem ID có hợp lệ không
+            if not pk or not pk.isdigit():
+                return Response(
+                    {"detail": "Invalid image ID."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             # Tìm ảnh theo ID, sử dụng select_related để tối ưu
             image = get_object_or_404(
                 Image.objects.select_related('user', 'user__user'),
@@ -298,42 +305,85 @@ class ImageViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            user_profile = request.user.userprofile
+            # Lấy userprofile của người dùng hiện tại
+            try:
+                user_profile = request.user.userprofile
+            except Exception as e:
+                print(f"Error getting user profile: {e}")
+                return Response(
+                    {"detail": "User profile not found. Please complete your profile setup."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Kiểm tra xem người dùng đã like ảnh hay chưa
             liked = LikedImage.objects.filter(user=user_profile, image=image).exists()
             
             if liked:
                 # Nếu đã like rồi thì bỏ like
-                LikedImage.objects.filter(user=user_profile, image=image).delete()
-                image.likes -= 1
-                image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
-                return Response({"status": "delete like", "likes": image.likes})
+                try:
+                    LikedImage.objects.filter(user=user_profile, image=image).delete()
+                    image.likes = max(0, image.likes - 1)  # Đảm bảo likes không âm
+                    image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
+                    print(f"User {user_profile.user.username} unliked image {image.id}")
+                    return Response({"status": "unlike_success", "likes": image.likes})
+                except Exception as e:
+                    print(f"Error during unlike: {e}")
+                    return Response(
+                        {"detail": f"Error removing like: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             else:
                 # Tiến hành like ảnh
-                image.likes += 1
-                image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
-
-                # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
-                if image.user != user_profile:
-                    create_notification(
-                        sender_profile=user_profile,
-                        recipient_profile=image.user,
-                        notification_type='like',
-                        content=f"liked your photo '{image.title or 'Untitled'}'"
+                try:
+                    # Tạo bản ghi like trong database
+                    LikedImage.objects.create(user=user_profile, image=image)
+                    
+                    # Tăng số lượt like
+                    image.likes += 1
+                    image.save(update_fields=['likes'])  # Chỉ cập nhật trường likes
+                    
+                    print(f"User {user_profile.user.username} liked image {image.id}")
+                    
+                    # Nếu người dùng có userprofile và ảnh không phải của chính họ thì tạo thông báo
+                    if image.user != user_profile:
+                        try:
+                            create_notification(
+                                sender_profile=user_profile,
+                                recipient_profile=image.user,
+                                notification_type='like',
+                                content=f"liked your photo '{image.title or 'Untitled'}'"
+                            )
+                        except Exception as notification_error:
+                            print(f"Error creating notification for like: {notification_error}")
+                            # Không trả về lỗi vì thông báo không quan trọng bằng việc like thành công
+                    
+                    # Trả về cả thông tin ảnh đã cập nhật để frontend có thể cập nhật
+                    serializer = self.get_serializer(image)
+                    return Response({
+                        "status": "like_success", 
+                        "likes": image.likes,
+                        "image": serializer.data  # Thêm data ảnh cập nhật
+                    })
+                except Exception as e:
+                    print(f"Error during like: {e}")
+                    return Response(
+                        {"detail": f"Error adding like: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST
                     )
 
-                # Tạo bản ghi like trong database
-                LikedImage.objects.create(user=user_profile, image=image)
-                
-                # Trả về cả thông tin ảnh đã cập nhật để frontend có thể cập nhật
-                serializer = self.get_serializer(image)
-                return Response({
-                    "status": "success", 
-                    "likes": image.likes,
-                    "image": serializer.data  # Thêm data ảnh cập nhật
-                })
-
+        except Image.DoesNotExist:
+            return Response(
+                {"detail": f"Image with ID {pk} not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            import traceback
+            print(f"Unexpected error in like_image: {e}")
+            print(traceback.format_exc())
+            return Response(
+                {"detail": f"An unexpected error occurred: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=True, methods=['post'], url_path='download')
     def download_image(self, request, pk=None):
@@ -550,16 +600,61 @@ class ImageSearchViewSet(viewsets.ViewSet):
         try:
             # Use singleton pattern to get CLIPImageSearch instance
             search_engine = CLIPImageSearch.get_instance()
-            results = search_engine.search(query, top_k=top_k)
+            
+            # Sử dụng try-except cụ thể cho tìm kiếm text để xử lý lỗi Redis
+            try:
+                results = search_engine.search(query, top_k=top_k)
+            except Exception as search_error:
+                print(f"Redis error during text search: {search_error}. Using search without cache.")
+                # Thử lại mà không dùng cache nếu có lỗi Redis
+                results = search_engine.search(query, top_k=top_k, use_cache=False)
+            
+            # Chuẩn bị kết quả
+            results_with_db_data = []
+            for result in results:
+                image_id = result.get('id')
+                if image_id:
+                    try:
+                        if request.user.is_authenticated:
+                            img = Image.objects.filter(
+                                Q(id=image_id, is_public=True) |
+                                Q(id=image_id, user=request.user.userprofile)
+                            ).first()
+                        else:
+                            img = Image.objects.filter(id=image_id, is_public=True).first()
+
+                        if img:
+                            result_item = {
+                                'id': img.id,
+                                'file': img.file.url if hasattr(img.file, 'url') else str(img.file),
+                                'title': getattr(img, 'title', ''),
+                                'description': getattr(img, 'description', ''),
+                                'similarity_score': result.get('similarity_score', 0),
+                                'user': str(img.user) if hasattr(img, 'user') else None,
+                                'likes': getattr(img, 'likes', 0),
+                                'downloads': getattr(img, 'downloads', 0),
+                            }
+                            results_with_db_data.append(result_item)
+                    except Exception as e:
+                        print(f"Error retrieving image {image_id} data: {e}")
+                        # Vẫn giữ nguyên kết quả từ index để không làm mất kết quả tìm kiếm
+                        results_with_db_data.append(result)
+                else:
+                    # Nếu không có ID, thêm kết quả nguyên bản
+                    results_with_db_data.append(result)
+            
             return Response({
-                'count': len(results),
-                'results': results
+                'count': len(results_with_db_data),
+                'results': results_with_db_data
             })
         except Exception as e:
             import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error in text search: {e}")
+            print(f"Traceback: {error_trace}")
             return Response({
                 'error': str(e),
-                'traceback': traceback.format_exc()
+                'message': 'Lỗi khi tìm kiếm văn bản. Vui lòng thử lại sau.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['post'], url_path='url')

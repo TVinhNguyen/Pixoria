@@ -99,25 +99,98 @@ class Image(models.Model):
         """ Tự động cập nhật số lượng ảnh khi lưu """
         super().save(*args, **kwargs)
         self.user.update_counts()
+        # Cache ảnh khi lưu
+        from django.core.cache import cache
+        cache_key = f'image:{self.id}'
+        cache.set(cache_key, self, 60*60*24)  # Cache trong 24 giờ
     
     def like_image(self, user_profile):
-        """ Hàm xử lý khi user like ảnh """
-        if not LikedImage.objects.filter(user=user_profile, image=self).exists():
-            LikedImage.objects.create(user=user_profile, image=self)  # Thêm vào danh sách like
-            self.likes += 1  # Tăng số lượt like
-            self.save()
-            return True  # Like thành công
-        return False  # Đã like trước đó
+        """ Hàm xử lý khi user like ảnh sử dụng Redis để cải thiện hiệu suất với fallback """
+        try:
+            from django.core.cache import cache
+            
+            # Tạo các key cho Redis
+            like_key = f'user:{user_profile.id}:liked:{self.id}'
+            image_likes_key = f'image:{self.id}:likes'
+            
+            # Thử kiểm tra trong Redis cache
+            try:
+                # Kiểm tra xem người dùng đã like chưa thông qua Redis
+                if cache.get(like_key):
+                    return False  # Đã like trước đó
+            except Exception as redis_error:
+                print(f"Redis cache không khả dụng khi kiểm tra like: {redis_error}")
+                # Tiếp tục và chỉ sử dụng database
+            
+            # Kiểm tra trong database
+            if not LikedImage.objects.filter(user=user_profile, image=self).exists():
+                # Tạo bản ghi LikedImage trong database
+                LikedImage.objects.create(user=user_profile, image=self)
+                
+                # Cập nhật số lượt like trong database
+                self.likes += 1
+                self.save(update_fields=['likes'])
+                
+                # Thử cập nhật Redis cache nếu có thể
+                try:
+                    cache.set(like_key, 1, 60*60*24*30)  # Cache trong 30 ngày
+                    cache.set(image_likes_key, self.likes, 60*60*24)  # Cache trong 24 giờ
+                except Exception as redis_error:
+                    print(f"Redis cache không khả dụng khi cập nhật like: {redis_error}")
+                    # Bỏ qua lỗi Redis và tiếp tục
+                
+                return True  # Like thành công
+            return False  # Đã like trước đó
+        except Exception as e:
+            # Ghi lại lỗi và fallback về database
+            print(f"Lỗi xử lý like_image: {e}")
+            # Kiểm tra database và thực hiện thao tác an toàn
+            if not LikedImage.objects.filter(user=user_profile, image=self).exists():
+                LikedImage.objects.create(user=user_profile, image=self)
+                self.likes += 1
+                self.save(update_fields=['likes'])
+                return True
+            return False
 
     def unlike_image(self, user_profile):
-        """ Hàm xử lý khi user bỏ like ảnh """
-        liked_image = LikedImage.objects.filter(user=user_profile, image=self)
-        if liked_image.exists():
-            liked_image.delete()  # Xóa khỏi danh sách like
-            self.likes -= 1  # Giảm số lượt like
-            self.save()
-            return True  # Bỏ like thành công
-        return False  # Ảnh chưa được like trước đó
+        """ Hàm xử lý khi user bỏ like ảnh sử dụng Redis để cải thiện hiệu suất với fallback"""
+        try:
+            from django.core.cache import cache
+            
+            # Tạo các key cho Redis
+            like_key = f'user:{user_profile.id}:liked:{self.id}'
+            image_likes_key = f'image:{self.id}:likes'
+            
+            # Xoá like khỏi database
+            liked_image = LikedImage.objects.filter(user=user_profile, image=self)
+            if liked_image.exists():
+                liked_image.delete()
+                
+                # Cập nhật số lượt like trong database
+                self.likes = max(0, self.likes - 1)  # Đảm bảo likes không âm
+                self.save(update_fields=['likes'])
+                
+                # Thử cập nhật Redis cache nếu có thể
+                try:
+                    cache.delete(like_key)
+                    cache.set(image_likes_key, self.likes, 60*60*24)  # Cache trong 24 giờ
+                except Exception as redis_error:
+                    print(f"Redis cache không khả dụng khi cập nhật unlike: {redis_error}")
+                    # Bỏ qua lỗi Redis và tiếp tục
+                
+                return True  # Bỏ like thành công
+            return False  # Ảnh chưa được like trước đó
+        except Exception as e:
+            # Ghi lại lỗi và fallback về database
+            print(f"Lỗi xử lý unlike_image: {e}")
+            # Kiểm tra database và thực hiện thao tác an toàn
+            liked_image = LikedImage.objects.filter(user=user_profile, image=self)
+            if liked_image.exists():
+                liked_image.delete()
+                self.likes = max(0, self.likes - 1)
+                self.save(update_fields=['likes'])
+                return True
+            return False
 
 
 @receiver(post_save, sender=Image)
