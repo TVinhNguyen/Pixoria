@@ -693,7 +693,7 @@ class FollowViewSet(viewsets.ModelViewSet):
         if following_id:
             queryset = queryset.filter(following_id=following_id)
             
-        return queryset
+        return queryset.order_by('id')
     
     def create(self, request, *args, **kwargs):
         """Create a new follow relationship"""
