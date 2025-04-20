@@ -28,12 +28,13 @@ sqlparse==0.5.3
 typing_extensions==4.12.2
 tzdata==2025.1
 urllib3==2.3.0
-dj_database_url
-torch 
-torchvision
-faiss-cpu 
-numpy 
-requests  
-tqdm
-transformers
+dj_database_url==2.0.0
+torch==2.1.2
+torchvision==0.16.2
+faiss-cpu==1.7.4
+numpy==1.24.4
+requests==2.31.0
+tqdm==4.66.1
+transformers==4.35.2
 clip @ git+https://github.com/openai/CLIP.git
+gunicorn==21.2.0
