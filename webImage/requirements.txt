@@ -38,3 +38,6 @@ tqdm==4.66.1
 transformers==4.35.2
 clip @ git+https://github.com/openai/CLIP.git
 gunicorn==21.2.0
+channels==4.0.0
+channels-redis==4.1.0
+daphne==4.0.0

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 import { handleNotificationClick, handleMarkedAllAsReadClick, handleMarkAsRead } from "@/lib/api-action/api-notification"
+import { useNotificationSocket } from "@/hooks/use-notification-socket"
 
 const scrollbarStyles =
   `
@@ -41,12 +42,22 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [imageError, setImageError] = useState<Record<number, boolean>>({})
+  
+  // Sử dụng hook WebSocket để nhận thông báo realtime
+  const { hasNewNotification } = useNotificationSocket()
 
   useEffect(() => {
     if (isOpen) {
       fetchNotifications()
     }
   }, [isOpen])
+  
+  // Tự động làm mới khi có thông báo mới
+  useEffect(() => {
+    if (isOpen && hasNewNotification) {
+      fetchNotifications()
+    }
+  }, [isOpen, hasNewNotification])
 
   const fetchNotifications = async () => {
     setIsLoading(true)

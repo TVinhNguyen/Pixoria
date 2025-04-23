@@ -42,3 +42,23 @@ export async function handleMarkAsRead(id: number) {
     }
     return await response.json()
 }
+
+export async function getUnreadNotificationCount() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/notifications/count/`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            },
+        })
+        if (!response.ok) {
+            throw new Error("Error fetching notification count")
+        }
+        const data = await response.json()
+        return data.unread_count
+    } catch (error) {
+        console.error("Error fetching notification count:", error)
+        return 0
+    }
+}
