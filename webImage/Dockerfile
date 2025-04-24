@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1
+# Set Django settings module environment variable
+ENV DJANGO_SETTINGS_MODULE=webImage.settings
 WORKDIR /app
 
 # Cài git + các thư viện hệ thống cần thiết
@@ -13,4 +15,5 @@ RUN python -c "import clip; clip.load('ViT-B/32')"
 
 COPY . .
 EXPOSE 8000
-CMD ["gunicorn", "webImage.wsgi:application", "--bind", "0.0.0.0:8000", "--timeout", "300"]
+# Replace gunicorn with daphne for ASGI support
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "webImage.asgi:application"]

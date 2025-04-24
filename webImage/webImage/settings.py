@@ -69,12 +69,13 @@ INSTALLED_APPS = [
 ]
 ASGI_APPLICATION = "webImage.asgi.application"
 
+# Updated Channel Layers configuration with proper Redis auth format
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(REDIS_HOST, REDIS_PORT)],
-            "password": REDIS_PASSWORD if REDIS_PASSWORD else None,
+            # Format Redis URL with password if it exists
+            "hosts": [f"redis://{(':' + REDIS_PASSWORD + '@') if REDIS_PASSWORD else ''}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"],
         },
     },
 }
