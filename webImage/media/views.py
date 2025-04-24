@@ -280,7 +280,61 @@ class ImageViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
-    
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='category/(?P<category_id>[^/.]+)')
+    def images_by_category(self, request, category_id=None):
+        """Endpoint lấy ảnh theo category ID hoặc slug"""
+        try:
+            # Xác định nếu tham số là slug (string) hay ID (số)
+            if category_id.isdigit():
+                # Nếu là số, tìm theo ID
+                category = get_object_or_404(Category, id=category_id)
+            else:
+                # Nếu là chuỗi, tìm theo slug
+                category = get_object_or_404(Category, slug=category_id)
+            
+            # Tìm các bản ghi ImageCategory chứa category
+            image_categories = ImageCategory.objects.filter(category=category)
+            image_ids = image_categories.values_list('image_id', flat=True)
+            
+            # Lấy các ảnh public hoặc ảnh của người dùng hiện tại
+            if request.user.is_authenticated:
+                queryset = Image.objects.filter(
+                    Q(id__in=image_ids, is_public=True) | 
+                    Q(id__in=image_ids, user=request.user.userprofile)
+                ).select_related('user', 'user__user')
+            else:
+                queryset = Image.objects.filter(
+                    id__in=image_ids, 
+                    is_public=True
+                ).select_related('user', 'user__user')
+            
+            # Áp dụng sắp xếp tương tự như phương thức public_images
+            sort_by = request.query_params.get('sort', 'created_at')
+            order = request.query_params.get('order', 'desc')
+            
+            if sort_by in ['created_at', 'likes', 'downloads']:
+                sort_field = f"{'-' if order == 'desc' else ''}{sort_by}"
+                queryset = queryset.order_by(sort_field)
+            
+            # Áp dụng phân trang
+            page = self.paginate_queryset(queryset)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response({
+                    'category': CategorySerializer(category).data,
+                    'images': serializer.data
+                })
+            
+            serializer = self.get_serializer(queryset, many=True)
+            return Response({
+                'category': CategorySerializer(category).data,
+                'images': serializer.data
+            })
+        
+        except Exception as e:
+            return Response({
+                'error': f'Lỗi khi lấy ảnh theo danh mục: {str(e)}'
+            }, status=status.HTTP_400_BAD_REQUEST)
     @action(detail=True, methods=['post'], url_path='like')
     def like_image(self, request, pk=None):
         """API endpoint để like ảnh, tự động xác định loại ảnh"""
@@ -799,7 +853,7 @@ class NotificationViewSet(mixins.ListModelMixin,
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user.userprofile)
 
-    @action(detail=False, methods=['get'], url_path='get-notifications', permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get'], url_path='get-notifications')
     def get_notifications(self, request):
         """Lấy tất cả thông báo của người dùng hiện tại"""
         notifications = self.get_queryset().order_by('-sent_at')
@@ -833,7 +887,7 @@ class NotificationViewSet(mixins.ListModelMixin,
         notifications.update(is_read=True)
         return Response({"status": "success", "message": "All notifications marked as read"})
     
-    @action(detail=False, methods=['get'], url_path='count', permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get'], url_path='count')
     def get_notification_count(self, request):
         """API endpoint để lấy số lượng thông báo chưa đọc"""
         unread_count = self.get_queryset().filter(is_read=False).count()

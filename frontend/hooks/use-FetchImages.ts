@@ -73,9 +73,23 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
     const fetchImages = async () => {
       setLoading(true);
       try {
-        const response = await fetch(`${API_BASE_URL}/images/public_images/?page=${currentPage}&limit=${limit}`, {
-          method: "GET"
-        });
+        // Check if user is logged in
+        const token = localStorage.getItem("token");
+        
+        // Create headers object based on authentication status
+        const headers: HeadersInit = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        
+        const response = await fetch(
+          `${API_BASE_URL}/images/public_images/?page=${currentPage}&limit=${limit}`, 
+          {
+            method: "GET",
+            headers: headers
+          }
+        );
+        
         if (!response.ok) {
           throw new Error(`Lỗi HTTP: ${response.status}`);
         }
@@ -83,6 +97,7 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
         const data: ApiResponse = await response.json();
         console.log("Data fetched:", data);
         
+        // Rest of your code for formatting images remains the same
         const formattedImages: AppImageData[] = data.results.map(img => ({
           id: img.id,
           file: img.file,
@@ -93,7 +108,6 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
           title: img.title || "",
           description: img.description || "",
           username: img.username || "",
-          // Đảm bảo có thông tin tác giả đầy đủ
           author: img.author || {
             user_id: 0,
             username: img.username || "user",
@@ -111,7 +125,6 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
           is_public: img.is_public
         }));
         
-        console.log("Formatted images:", formattedImages);
         setImages(formattedImages);
         setTotalPages(Math.ceil(data.count / limit));
       } catch (error) {
