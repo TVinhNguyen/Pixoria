@@ -60,14 +60,23 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   }, [isOpen, hasNewNotification])
 
   const fetchNotifications = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const data = await handleNotificationClick()
-      setNotifications(data)
+      const data = await handleNotificationClick();
+      setNotifications(data);
+    } catch (error: any) {
+      // Nếu không đăng nhập hoặc lỗi API
+      if (error.message.includes("Not authenticated") || error.message.includes("403")) {
+        console.warn("Bạn chưa đăng nhập — không thể lấy thông báo.");
+        // Có thể setNotifications([]) hoặc hiện toast
+      } else {
+        console.error("Lỗi khi fetch thông báo:", error);
+      }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+  
 
   const handleMarkedAllAsRead = async () => {
     try {

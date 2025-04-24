@@ -799,7 +799,7 @@ class NotificationViewSet(mixins.ListModelMixin,
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user.userprofile)
 
-    @action(detail=False, methods=['get'], url_path='get-notifications')
+    @action(detail=False, methods=['get'], url_path='get-notifications', permission_classes=[IsAuthenticated])
     def get_notifications(self, request):
         """Lấy tất cả thông báo của người dùng hiện tại"""
         notifications = self.get_queryset().order_by('-sent_at')
@@ -833,7 +833,7 @@ class NotificationViewSet(mixins.ListModelMixin,
         notifications.update(is_read=True)
         return Response({"status": "success", "message": "All notifications marked as read"})
     
-    @action(detail=False, methods=['get'], url_path='count')
+    @action(detail=False, methods=['get'], url_path='count', permission_classes=[IsAuthenticated])
     def get_notification_count(self, request):
         """API endpoint để lấy số lượng thông báo chưa đọc"""
         unread_count = self.get_queryset().filter(is_read=False).count()

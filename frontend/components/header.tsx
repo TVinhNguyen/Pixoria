@@ -99,14 +99,24 @@ export default function Header() {
   
   const fetchNotificationCount = async () => {
     try {
-      if (localStorage.getItem("token")) {
-        const count = await getUnreadNotificationCount();
-        setUnreadNotificationCount(count);
+      const token = localStorage.getItem("token");
+  
+      if (!token) {
+        console.log("Người dùng chưa đăng nhập, không gọi API.");
+        return;
       }
-    } catch (error) {
-      console.error("Error fetching notification count:", error);
+  
+      const count = await getUnreadNotificationCount();
+      setUnreadNotificationCount(count);
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        console.warn("Token không hợp lệ hoặc đã hết hạn.");
+      } else {
+        console.error("Lỗi khi fetch số thông báo:", error);
+      }
     }
   };
+  
   
   const handleUpload = () => {
     window.location.href = "/upload";
