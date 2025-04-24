@@ -74,10 +74,7 @@ const useFetchImages = (currentPage: number, limit: number = 12) => {
       setLoading(true);
       try {
         const response = await fetch(`${API_BASE_URL}/images/public_images/?page=${currentPage}&limit=${limit}`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          method: "GET"
         });
         if (!response.ok) {
           throw new Error(`Lỗi HTTP: ${response.status}`);

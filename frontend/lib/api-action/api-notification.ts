@@ -1,19 +1,23 @@
 import API_BASE_URL from "../api-config"
 
-export async function handleNotificationClick() {
+export const handleNotificationClick = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("Not authenticated");
+  
     const response = await fetch(`${API_BASE_URL}/notifications/get-notifications/`, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-    })
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  
     if (!response.ok) {
-        throw new Error("Error fetching notifications!")
+      if (response.status === 403) throw new Error("Not authenticated");
+      throw new Error(`HTTP error: ${response.status}`);
     }
-    const data = await response.json()
-    return data
-}
+  
+    return await response.json();
+  };
+  
 
 export async function handleMarkedAllAsReadClick() {
     const response = await fetch(`${API_BASE_URL}/notifications/mark-all-as-read/`, {
