@@ -37,7 +37,8 @@ jobs:
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:latest
         cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:buildcache
         cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:buildcache,mode=max
-    
+        build-args: |
+          NEXT_PUBLIC_API_BASE_URL=https://${{ secrets.DOMAIN_OR_IP }}/api
     # Deploy to EC2
     - name: Deploy to AWS EC2
       uses: appleboy/ssh-action@v1
