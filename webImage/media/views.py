@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from clip_retrieval.clip_search import CLIPImageSearch
 import boto3
 from django.conf import settings
+import traceback
 
 import os
 import tempfile
@@ -702,7 +703,6 @@ class ImageSearchViewSet(viewsets.ViewSet):
                 'results': results_with_db_data
             })
         except Exception as e:
-            import traceback
             error_trace = traceback.format_exc()
             print(f"Error in text search: {e}")
             print(f"Traceback: {error_trace}")
