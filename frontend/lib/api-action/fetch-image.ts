@@ -1,6 +1,6 @@
 import API_BASE_URL from "../api-config"
 
-const fetchImages = async (page: number, perPage: number) => {
+export const fetchImages = async (page: number, perPage: number) => {
   try {
     const response = await fetch(`${API_BASE_URL}/images/?page=${page}&limit=${perPage}`, {
       headers: {
@@ -22,7 +22,6 @@ const fetchImages = async (page: number, perPage: number) => {
       height: image.height || 250,
     }))
   } catch (error) {
-    console.error("Error fetching images:", error)
     return []
   }
 }

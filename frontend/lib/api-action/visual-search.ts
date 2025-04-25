@@ -28,7 +28,7 @@ export async function searchByImage(imageFile: File): Promise<VisualSearchResult
     formData.append("top_k", "20"); // Số lượng kết quả mong muốn
     
     // Chuẩn bị headers
-    const headers: HeadersInit = {};
+    const headers: Record<string, string> = {};
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
@@ -54,14 +54,11 @@ export async function searchByImage(imageFile: File): Promise<VisualSearchResult
         errorMessage = errorText || errorMessage;
       }
       
-      console.error("Search API error:", errorText);
       throw new Error(errorMessage);
     }
     
     // Phân tích kết quả trả về
     const data = await response.json();
-    
-    console.log("Raw API response:", data);
     
     // Chuyển đổi kết quả từ API thành định dạng VisualSearchResult
     const results: VisualSearchResult[] = data.results.map((item: any) => {
@@ -89,10 +86,8 @@ export async function searchByImage(imageFile: File): Promise<VisualSearchResult
       };
     });
     
-    console.log("Processed search results:", results);
     return results;
   } catch (error) {
-    console.error("Error in searchByImage:", error);
     throw error;
   }
 }
@@ -103,7 +98,7 @@ export async function searchByImageUrl(imageUrl: string): Promise<VisualSearchRe
     const token = localStorage.getItem("token");
     
     // Chuẩn bị headers
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
     
@@ -134,7 +129,6 @@ export async function searchByImageUrl(imageUrl: string): Promise<VisualSearchRe
         errorMessage = errorText || errorMessage;
       }
       
-      console.error("Search API error:", errorText);
       throw new Error(errorMessage);
     }
     
@@ -169,7 +163,6 @@ export async function searchByImageUrl(imageUrl: string): Promise<VisualSearchRe
     
     return results;
   } catch (error) {
-    console.error("Error in searchByImageUrl:", error);
     throw error;
   }
 }
@@ -178,7 +171,7 @@ export async function searchByText(query: string): Promise<VisualSearchResult[]>
   try {
     const token = localStorage.getItem("token");
 
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
 
@@ -206,7 +199,6 @@ export async function searchByText(query: string): Promise<VisualSearchResult[]>
         errorMessage = errorText || errorMessage;
       }
 
-      console.error("Text search API error:", errorText);
       throw new Error(errorMessage);
     }
 
@@ -240,10 +232,8 @@ export async function searchByText(query: string): Promise<VisualSearchResult[]>
       return results;
     }
 
-    // ✅ Fix thiếu return
     return [];
   } catch (error) {
-    console.error("Error in searchByText:", error);
     throw error;
   }
 }

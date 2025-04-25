@@ -50,3 +50,13 @@ jobs:
             echo "❌ next.config.mjs not found"
             exit 1
           fi
+          
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+          
+      - name: Run ESLint
+        run: |
+          cd frontend
+          npm run lint

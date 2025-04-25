@@ -9,7 +9,6 @@ export async function handleLike(image_id: number) {
         },
     })
     const data = await response.json()
-    console.log(data)
     return data
 }
 
@@ -22,6 +21,5 @@ export async function handleDownload(image_id: number) {
         },
     })
     const data = await response.json()
-    console.log(data)
     return data
 }
