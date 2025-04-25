@@ -2,7 +2,7 @@ name: Docker Compose Check
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "develop" ]
     paths:
       - 'docker-compose.yml'
       - '**/Dockerfile'
