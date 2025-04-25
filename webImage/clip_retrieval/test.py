@@ -1,18 +1,50 @@
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+import unittest
+from unittest.mock import patch, MagicMock
 
-from clip_retrieval.run_test import run_test
+# Tạo mock để có thể test mà không cần file thực tế
+# Điều này giúp CI/CD có thể chạy test mà không cần dữ liệu thực
 
-# Ví dụ sử dụng cơ bản
-results = run_test(
-    index_path="D:/VS\Django\pexels/Pixoria/webImage/mediafiles/clip_index/photo_index_clip.faiss",
-    mapping_path="D:/VS/Django/pexels/Pixoria/webImage/mediafiles/clip_index/photo_mapping_clip.pkl",
-    queries=["bầu trời"],
-    top_k=5,
-    use_gpu=True
-)
+class TestCLIPRetrieval(unittest.TestCase):
+    """Test cases cho module CLIP Retrieval."""
+    
+    @patch('clip_retrieval.run_test.CLIPRetriever')
+    def test_run_test_basic(self, mock_retriever_class):
+        """Test cơ bản cho hàm run_test."""
+        from clip_retrieval.run_test import run_test
+        
+        # Setup mock
+        mock_retriever = MagicMock()
+        mock_retriever.retrieve_images.return_value = [
+            {"file": "test1.jpg", "similarity_score": 0.9},
+            {"file": "test2.jpg", "similarity_score": 0.8}
+        ]
+        mock_retriever_class.return_value = mock_retriever
+        
+        # Thiết lập đường dẫn index giả
+        index_path = "dummy_index_path.faiss"
+        mapping_path = "dummy_mapping_path.pkl"
+        
+        # Tạo file giả để kiểm tra tồn tại
+        with patch('os.path.exists', return_value=True):
+            # Chạy test
+            results = run_test(
+                index_path=index_path,
+                mapping_path=mapping_path,
+                queries=["test query"],
+                top_k=2,
+                use_gpu=False,
+                save_results=False
+            )
+        
+        # Kiểm tra kết quả
+        self.assertIsNotNone(results)
+        self.assertIn("test query", results)
+        self.assertEqual(len(results["test query"]), 2)
+        
+        # Kiểm tra các method được gọi đúng
+        mock_retriever_class.assert_called_once_with(index_path, mapping_path, use_gpu=False)
+        mock_retriever.retrieve_images.assert_called_once_with("test query", top_k=2)
 
-# Xử lý kết quả tìm kiếm nếu cần
-if results:
-    for query, search_results in results.items():
-        print(f"Truy vấn '{query}' có {len(search_results)} kết quả")
+if __name__ == '__main__':
+    unittest.main()
