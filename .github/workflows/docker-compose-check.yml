@@ -1,0 +1,35 @@
+name: Docker Compose Check
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'docker-compose.yml'
+      - '**/Dockerfile'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'docker-compose.yml'
+      - '**/Dockerfile'
+
+jobs:
+  docker-compose-validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate docker-compose
+      run: docker-compose config
+      
+    - name: Test docker-compose build
+      run: |
+        docker-compose build --no-cache
+        
+    - name: Test docker-compose up
+      run: |
+        docker-compose up -d
+        sleep 10
+        docker-compose ps
+        docker-compose logs
+        docker-compose down

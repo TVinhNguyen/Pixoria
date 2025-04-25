@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'storages',
     'corsheaders',
+    'channels',
     # Local apps
     'media',
     'imageretrieval',
@@ -66,7 +67,18 @@ INSTALLED_APPS = [
     
 
 ]
+ASGI_APPLICATION = "webImage.asgi.application"
 
+# Updated Channel Layers configuration with proper Redis auth format
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # Format Redis URL with password if it exists
+            "hosts": [f"redis://{(':' + REDIS_PASSWORD + '@') if REDIS_PASSWORD else ''}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"],
+        },
+    },
+}
 # Middleware
 MIDDLEWARE = [
     # The first is to allow to fetch data

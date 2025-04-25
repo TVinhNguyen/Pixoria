@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   redis-server:
@@ -11,12 +11,12 @@ services:
 
   backend:
     build:
-      context: ./webimage
+      context: ./webImage
       dockerfile: Dockerfile
     env_file:
-      - ./webimage/.env
+      - ./webImage/.env
     volumes:
-      - ./webimage:/app
+      - ./webImage:/app
       - clip-cache:/root/.cache/clip  
     ports:
       - "8000:8000"

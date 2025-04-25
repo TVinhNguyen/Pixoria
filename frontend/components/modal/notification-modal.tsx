@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Image from "next/image"
 import { handleNotificationClick, handleMarkedAllAsReadClick, handleMarkAsRead } from "@/lib/api-action/api-notification"
+import { useNotificationSocket } from "@/hooks/use-notification-socket"
 
 const scrollbarStyles =
   `
@@ -41,22 +42,41 @@ export default function NotificationModal({ isOpen, onClose }: NotificationModal
   const [notifications, setNotifications] = useState<NotificationData[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [imageError, setImageError] = useState<Record<number, boolean>>({})
+  
+  // Sử dụng hook WebSocket để nhận thông báo realtime
+  const { hasNewNotification } = useNotificationSocket()
 
   useEffect(() => {
     if (isOpen) {
       fetchNotifications()
     }
   }, [isOpen])
+  
+  // Tự động làm mới khi có thông báo mới
+  useEffect(() => {
+    if (isOpen && hasNewNotification) {
+      fetchNotifications()
+    }
+  }, [isOpen, hasNewNotification])
 
   const fetchNotifications = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const data = await handleNotificationClick()
-      setNotifications(data)
+      const data = await handleNotificationClick();
+      setNotifications(data);
+    } catch (error: any) {
+      // Nếu không đăng nhập hoặc lỗi API
+      if (error.message.includes("Not authenticated") || error.message.includes("403")) {
+        console.warn("Bạn chưa đăng nhập — không thể lấy thông báo.");
+        // Có thể setNotifications([]) hoặc hiện toast
+      } else {
+        console.error("Lỗi khi fetch thông báo:", error);
+      }
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
+  
 
   const handleMarkedAllAsRead = async () => {
     try {

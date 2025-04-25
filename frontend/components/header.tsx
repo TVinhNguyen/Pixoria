@@ -1,10 +1,12 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Moon, Sun, Upload, Bell, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/hooks/use-theme"
+import { useToast } from "@/hooks/use-toast"
+import { useNotificationSocket } from "@/hooks/use-notification-socket"
 
 import ProfileModal from "./modal/profile-modal"
 import LoginModal from "./modal/login-modal"
@@ -12,15 +14,27 @@ import NotificationModal from "./modal/notification-modal"
 
 import { ProfileData } from "./modal/profile-modal"
 import { handleProfileClick } from "@/lib/api-action/api-profile"
+import { getUnreadNotificationCount } from "@/lib/api-action/api-notification"
 
 export default function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
   const {theme, toggleTheme} = useTheme()
+  const { toast } = useToast()
 
   const [profileUser, setProfileUser] = useState<ProfileData | null>(null)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false)
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  
+  // Sử dụng custom hook để quản lý WebSocket
+  const { 
+    isConnected, 
+    hasNewNotification, 
+    newNotificationCount, 
+    latestNotification,
+    resetNewNotificationFlag 
+  } = useNotificationSocket()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,7 +47,43 @@ export default function Header() {
 
   useEffect(() => {
     fetchProfileData();
+    fetchNotificationCount();
+    
+    // Đặt polling làm backup cho WebSocket
+    const intervalId = setInterval(() => {
+      fetchNotificationCount();
+    }, 60000); // Kiểm tra mỗi 60 giây
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, []);
+
+  // Effect để xử lý khi có thông báo mới từ WebSocket
+  useEffect(() => {
+    if (hasNewNotification && latestNotification) {
+      // Cập nhật số lượng thông báo chưa đọc
+      setUnreadNotificationCount(prev => prev + newNotificationCount);
+      
+      // Hiển thị toast thông báo
+      try {
+        const notifData = typeof latestNotification === 'string' 
+          ? JSON.parse(latestNotification) 
+          : latestNotification;
+        
+        toast({
+          title: "Thông báo mới",
+          description: `@${notifData.sender_username} ${notifData.content}`,
+          variant: "default",
+        });
+      } catch (e) {
+        console.error("Error parsing notification:", e);
+      }
+      
+      // Reset flag sau khi đã xử lý
+      resetNewNotificationFlag();
+    }
+  }, [hasNewNotification, latestNotification, newNotificationCount, toast, resetNewNotificationFlag]);
   
   const fetchProfileData = async () => {
     try {
@@ -47,11 +97,31 @@ export default function Header() {
     }
   };
   
+  const fetchNotificationCount = async () => {
+    try {
+      const token = localStorage.getItem("token");
+  
+      if (!token) {
+        console.log("Người dùng chưa đăng nhập, không gọi API.");
+        return;
+      }
+  
+      const count = await getUnreadNotificationCount();
+      setUnreadNotificationCount(count);
+    } catch (error: any) {
+      if (error.response?.status === 403) {
+        console.warn("Token không hợp lệ hoặc đã hết hạn.");
+      } else {
+        console.error("Lỗi khi fetch số thông báo:", error);
+      }
+    }
+  };
+  
+  
   const handleUpload = () => {
     window.location.href = "/upload";
   };
   
-
   const handleClickUser = async () => {
     if (!profileUser) {
       setIsLoginModalOpen(true);
@@ -63,6 +133,8 @@ export default function Header() {
 
   const handleNotification = async () => {
     setIsNotificationModalOpen(true);
+    // Reset notification count when opening the notification modal
+    setUnreadNotificationCount(0);
   }
 
   return (
@@ -95,8 +167,13 @@ export default function Header() {
             <Button variant="ghost" size="icon" onClick={handleUpload}>
               <Upload className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleNotification}>
+            <Button variant="ghost" size="icon" onClick={handleNotification} className="relative">
               <Bell className="h-5 w-5" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white dark:ring-gray-900">
+                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                </span>
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={handleClickUser}>
               <User className="h-5 w-5" />
