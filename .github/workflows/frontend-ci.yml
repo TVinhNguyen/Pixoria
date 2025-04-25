@@ -45,7 +45,7 @@ jobs:
     - name: Lint check
       run: |
         cd frontend
-        npm run lint || true
+        npm run lint
         
     - name: Build check
       run: |
