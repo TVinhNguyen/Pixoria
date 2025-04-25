@@ -4,17 +4,7 @@
     "eslint:recommended"
   ],
   "rules": {
-    "react/no-unescaped-entities": "off",
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }]
-  },
-  "env": {
-    "browser": true,
-    "node": true,
-    "es6": true
-  },
-  "ignorePatterns": [
-    "node_modules/",
-    ".next/",
-    "out/"
-  ]
+    "no-unused-vars": "warn",
+    "no-console": "warn"
+  }
 }

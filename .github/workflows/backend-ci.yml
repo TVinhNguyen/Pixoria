@@ -46,6 +46,16 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-django flake8
         
+    - name: Setup Docker Compose
+      uses: KengoTODA/actions-setup-docker-compose@v1
+      with:
+        version: '2.20.2'
+        
+    - name: Validate docker-compose files
+      run: |
+        docker-compose -f docker-compose.yml config
+        docker-compose -f docker-compose.production.yml config
+        
     - name: Lint with flake8
       run: |
         cd webImage
