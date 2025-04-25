@@ -1,30 +1,23 @@
-# FROM node:18-alpine
-# WORKDIR /app
-
-# # Install dependencies using npm
-# COPY package.json package-lock.json ./
-# RUN npm install
-
-# # Copy source and start
-# COPY . .
-# EXPOSE 3000
-# # Use dev mode; change to "npm run dev" for development, or "npm run start" for production
-# CMD ["npm", "run", "dev"]
-
 FROM node:18-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 
 RUN npm run build
 
-FROM node:18-alpine
+FROM node:18-alpine AS runner
 WORKDIR /app
 
-COPY --from=builder /app ./
+ENV NODE_ENV production
+
+# Copy necessary files from builder stage
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]
