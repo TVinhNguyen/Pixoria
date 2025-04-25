@@ -3,15 +3,12 @@ name: Deploy to Production
 on:
   push:
     branches: [ "main" ]
-    # Ensure CI workflows have passed
     # You can also restrict to tags if you want to deploy only tagged versions
     # tags: [ 'v*' ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Comment out the needs to simplify first deployment
-    # needs: [backend-ci, frontend-ci]
     
     steps:
     - uses: actions/checkout@v4
@@ -31,8 +28,6 @@ jobs:
         context: ./webImage
         push: true
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-backend:latest,${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-backend:${{ github.sha }}
-        cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-backend:buildcache
-        cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-backend:buildcache,mode=max
         
     - name: Build and push frontend image
       uses: docker/build-push-action@v4
@@ -40,12 +35,10 @@ jobs:
         context: ./frontend
         push: true
         tags: ${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:latest,${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:${{ github.sha }}
-        cache-from: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:buildcache
-        cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:buildcache,mode=max
     
-    # Deployment options - Uncomment and customize based on your infrastructure
+    # Uncommment and customize one of these deployment options based on your infrastructure
     
-    # Option 1: Deploy via SSH to a server
+    # Option 1: Deploy via SSH to a VPS/custom server
     # - name: Deploy to server via SSH
     #   uses: appleboy/ssh-action@v0.1.10
     #   with:
@@ -58,17 +51,10 @@ jobs:
     #       docker-compose pull
     #       docker-compose up -d
     
-    # Option 2: Deploy to Kubernetes
-    # - name: Set up kubeconfig
-    #   uses: azure/k8s-set-context@v1
+    # Option 2: Deploy to a cloud platform like DigitalOcean App Platform
+    # - name: Install doctl
+    #   uses: digitalocean/action-doctl@v2
     #   with:
-    #     kubeconfig: ${{ secrets.KUBE_CONFIG }}
-    # 
-    # - name: Deploy to Kubernetes
-    #   run: |
-    #     # Update image versions in deployment files
-    #     sed -i 's|image: .*pixoria-backend:.*|image: ${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-backend:${{ github.sha }}|' k8s/backend-deployment.yaml
-    #     sed -i 's|image: .*pixoria-frontend:.*|image: ${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:${{ github.sha }}|' k8s/frontend-deployment.yaml
-    #     
-    #     # Apply Kubernetes manifests
-    #     kubectl apply -f k8s/
+    #     token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+    # - name: Update deployment
+    #   run: doctl apps update ${{ secrets.DO_APP_ID }} --spec .do/app.yaml
