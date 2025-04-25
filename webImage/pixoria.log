@@ -1,0 +1,72 @@
+INFO 2025-04-25 10:58:48,819 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:58:48,847 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:58:52,010 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:58:52,024 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:58:55,655 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:58:55,667 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:58:59,114 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:58:59,127 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:59:03,241 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:59:03,254 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:59:08,349 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:59:08,369 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:59:14,532 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:59:14,545 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:59:23,954 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:59:23,971 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 10:59:45,590 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 10:59:45,603 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:00:16,084 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:00:16,100 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:01:10,159 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:01:10,171 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:02:12,865 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:02:12,877 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:15,764 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:15,775 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:36,282 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:36,344 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:39,719 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:39,738 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:43,193 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:43,208 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:46,352 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:46,365 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:49,957 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:49,969 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:03:54,640 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:03:54,654 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:04:01,025 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:04:01,037 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:04:10,300 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:04:10,312 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:04:26,121 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:04:26,136 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:06:11,563 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:06:11,578 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:06:11,681 cli Starting server at tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:06:11,681 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2025-04-25 11:06:11,681 server Configuring endpoint tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:06:11,682 server Listening on TCP address 0.0.0.0:8000
+INFO 2025-04-25 11:07:53,554 server Killed 2 pending application instances
+INFO 2025-04-25 11:12:23,083 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:12:23,113 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:12:23,192 cli Starting server at tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:12:23,192 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2025-04-25 11:12:23,192 server Configuring endpoint tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:12:23,193 server Listening on TCP address 0.0.0.0:8000
+INFO 2025-04-25 11:13:11,608 server Killed 1 pending application instances
+INFO 2025-04-25 11:13:34,164 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 11:13:34,196 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 11:13:34,274 cli Starting server at tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:13:34,275 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2025-04-25 11:13:34,275 server Configuring endpoint tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 11:13:34,275 server Listening on TCP address 0.0.0.0:8000
+INFO 2025-04-25 11:16:24,869 server Killed 2 pending application instances
+INFO 2025-04-25 13:56:09,668 loader Loading faiss with AVX2 support.
+INFO 2025-04-25 13:56:09,688 loader Successfully loaded faiss with AVX2 support.
+INFO 2025-04-25 13:56:09,782 cli Starting server at tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 13:56:09,782 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2025-04-25 13:56:09,782 server Configuring endpoint tcp:port=8000:interface=0.0.0.0
+INFO 2025-04-25 13:56:09,783 server Listening on TCP address 0.0.0.0:8000
+INFO 2025-04-25 13:57:40,729 server Killed 2 pending application instances
