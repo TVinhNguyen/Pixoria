@@ -42,6 +42,7 @@ services:
     restart: always
     environment:
       - NEXT_PUBLIC_API_URL=https://${DOMAIN_OR_IP}/api
+      - NEXT_PUBLIC_API_BASE_URL=https://${DOMAIN_OR_IP}/api
       - NODE_ENV=production
     ports:
       - "3000:3000"
