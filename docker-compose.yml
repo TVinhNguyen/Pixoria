@@ -1,15 +1,42 @@
+# version: '3.8'
+
 services:
-  db:
-    image: postgres:15
-    container_name: pexels_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: pexels_user
-      POSTGRES_PASSWORD: securepassword
-      POSTGRES_DB: pexels_db
+  redis-server:
+    image: redis:latest
+    command: ["redis-server", "--requirepass", "ganhteamgg123"]
     ports:
-      - "5432:5432"
+      - "6379:6379"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - redis-data:/data
+
+  backend:
+    build:
+      context: ./webImage
+      dockerfile: Dockerfile
+    env_file:
+      - ./webImage/.env
+    volumes:
+      - ./webImage:/app
+      - clip-cache:/root/.cache/clip  
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis-server
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  
+    environment:
+      - WATCHPACK_POLLING=true  
+    depends_on:
+      - backend
+
 volumes:
-  postgres_data:
+  redis-data:
+  clip-cache:  

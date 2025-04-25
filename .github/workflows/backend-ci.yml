@@ -1,0 +1,63 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ "develop" ]
+    paths:
+      - 'webImage/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'webImage/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev
+        
+    - name: Install dependencies
+      run: |
+        cd webImage
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-django flake8
+        
+    - name: Lint with flake8
+      run: |
+        cd webImage
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Run tests
+      run: |
+        cd webImage
+        python manage.py test
+      env:
+        DJANGO_SETTINGS_MODULE: webImage.settings
+        # Add other environment variables as needed

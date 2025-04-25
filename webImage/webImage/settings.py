@@ -3,8 +3,12 @@ import os
 from datetime import timedelta
 from dotenv import load_dotenv
 import mimetypes
+import dj_database_url
+
+load_dotenv()
 
 # Base directory
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Secret key (Không dùng key này trong production!)
@@ -15,6 +19,30 @@ DEBUG = True
 
 # Allowed hosts (Thêm domain khi deploy)
 ALLOWED_HOSTS = ['*']
+
+# Redis Configuration
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', '')
+REDIS_DB = os.getenv('REDIS_DB', '0')
+
+# Cache settings with Redis
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            # Chỉ sử dụng password nếu nó thực sự được cung cấp và không phải là chuỗi rỗng
+            **({"PASSWORD": REDIS_PASSWORD} if REDIS_PASSWORD else {})
+        },
+        "KEY_PREFIX": "pixoria"
+    }
+}
+
+# Session with Redis
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
 
 # Installed apps
 INSTALLED_APPS = [
@@ -29,18 +57,32 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'storages',
-
+    'corsheaders',
+    'channels',
     # Local apps
     'media',
-
+    'imageretrieval',
+    # 'clip',
     # For request to server (pip install django-cors-headers)
-    'corsheaders'
-]
+    
 
+]
+ASGI_APPLICATION = "webImage.asgi.application"
+
+# Updated Channel Layers configuration with proper Redis auth format
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            # Format Redis URL with password if it exists
+            "hosts": [f"redis://{(':' + REDIS_PASSWORD + '@') if REDIS_PASSWORD else ''}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"],
+        },
+    },
+}
 # Middleware
 MIDDLEWARE = [
     # The first is to allow to fetch data
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -48,11 +90,24 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Rate limiting middleware
+    'media.middleware.RateLimitMiddleware',
 ]
 
 # Allow frontend to fetch data from backend
 CORS_ALLOW_ALL_ORIGINS = True
 
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # URL configuration
@@ -81,17 +136,7 @@ WSGI_APPLICATION = 'webImage.wsgi.application'
 # Database (PostgreSQL)
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'neondb',
-        'USER': 'neondb_owner',
-        'PASSWORD': 'npg_6QngZMp7ivRV',
-        'HOST': 'ep-little-morning-a7w9qhdt-pooler.ap-southeast-2.aws.neon.tech',
-        'PORT': '5432',
-        'OPTIONS': {
-            'sslmode': 'require',
-        }
-    }
+    'default': dj_database_url.config(conn_max_age=600, ssl_require=True)
 }
 
 # Password validation
@@ -114,21 +159,25 @@ STATIC_URL = 'static/'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Django REST Framework settings
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',  # Thêm dòng này để hiển thị nút Login
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.TokenAuthentication'
+        'rest_framework.authentication.TokenAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',  # Chuyển về PageNumberPagination
+    'PAGE_SIZE': 12,
 }
 
 
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
+MEDIA_URL = '/mediafiles/'
+INDEX_DIR = MEDIA_ROOT / "image_index"
+INDEX_CLIP_DIR = MEDIA_ROOT / "clip_index"
 # Simple JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
@@ -138,7 +187,6 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-load_dotenv()
 mimetypes.add_type("image/jpeg", ".mpo", strict=True)
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
