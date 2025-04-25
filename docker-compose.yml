@@ -17,9 +17,8 @@ services:
       - ./webImage/.env
     volumes:
       - ./webImage:/app
-      - clip-cache:/root/.cache/clip  
-    ports:
-      - "8000:8000"
+      - clip-cache:/root/.cache/clip
+    # Loại bỏ ports vì Nginx sẽ xử lý proxy
     depends_on:
       - redis-server
 
@@ -27,16 +26,25 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
     volumes:
       - ./frontend:/app
-      - /app/node_modules  
+      - /app/node_modules
     environment:
-      - WATCHPACK_POLLING=true  
+      - WATCHPACK_POLLING=true
+    # Loại bỏ ports vì Nginx sẽ xử lý proxy
     depends_on:
       - backend
 
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+      - frontend
+
 volumes:
   redis-data:
-  clip-cache:  
+  clip-cache:

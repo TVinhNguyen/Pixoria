@@ -18,12 +18,12 @@ def user_directory_path(instance, filename):
 
 # Đường dẫn đến file index và mapping
 INDEX_DIR = settings.INDEX_DIR
-INDEX_PATH = settings.INDEX_DIR / "photo_index.faiss"
-MAPPING_PATH = settings.INDEX_DIR / "photo_mapping.pkl"
+INDEX_PATH = os.path.join(settings.INDEX_DIR, "photo_index.faiss")
+MAPPING_PATH = os.path.join(settings.INDEX_DIR, "photo_mapping.pkl")
 
 INDEX_CLIP_DIR = settings.INDEX_CLIP_DIR
-INDEX_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_index_clip.faiss"
-MAPPING_CLIP_PATH = settings.INDEX_CLIP_DIR / "photo_mapping_clip.pkl"
+INDEX_CLIP_PATH = os.path.join(settings.INDEX_CLIP_DIR, "photo_index_clip.faiss")
+MAPPING_CLIP_PATH = os.path.join(settings.INDEX_CLIP_DIR, "photo_mapping_clip.pkl")
 
 # Replace the module-level instantiation with a function to get the singleton instance
 def get_clip_search():
