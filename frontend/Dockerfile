@@ -1,6 +1,12 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
+# Add build arguments for environment variables
+ARG NEXT_PUBLIC_API_BASE_URL
+
+# Set environment variables
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
 COPY package.json package-lock.json ./
 RUN npm ci
 
