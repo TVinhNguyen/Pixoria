@@ -1,0 +1,52 @@
+name: Main CI Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  validate-docker-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Docker Compose
+        uses: KengoTODA/actions-setup-docker-compose@v1
+        with:
+          version: '2.20.2'
+          
+      - name: Validate docker-compose files
+        run: |
+          docker-compose -f docker-compose.yml config
+          docker-compose -f docker-compose.production.yml config
+
+  frontend-healthcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Check package.json exists
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            echo "✅ Frontend package.json exists"
+          else
+            echo "❌ Frontend package.json not found"
+            exit 1
+          fi
+      
+      - name: Check required config files
+        run: |
+          mkdir -p frontend/logs
+          if [ -f "frontend/next.config.mjs" ]; then
+            echo "✅ next.config.mjs exists"
+          else
+            echo "❌ next.config.mjs not found"
+            exit 1
+          fi

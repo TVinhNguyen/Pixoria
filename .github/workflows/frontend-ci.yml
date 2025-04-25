@@ -29,6 +29,11 @@ jobs:
         cd frontend
         npm ci
         
+    - name: Install ESLint
+      run: |
+        cd frontend
+        npm install --save-dev eslint eslint-config-next
+        
     - name: Create ESLint config if it doesn't exist
       run: |
         cd frontend
