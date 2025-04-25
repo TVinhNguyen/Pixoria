@@ -11,7 +11,6 @@ export async function handleSignupClick(username: string, password: string, emai
     })
     const data = await response.json()
     if (response.ok) {
-        console.log(data)
         return data
     }
     return null
