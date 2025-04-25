@@ -13,7 +13,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       redis:
         image: redis
@@ -49,9 +49,7 @@ jobs:
     - name: Lint with flake8
       run: |
         cd webImage
-        # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
         
     - name: Run tests
@@ -60,4 +58,3 @@ jobs:
         python manage.py test
       env:
         DJANGO_SETTINGS_MODULE: webImage.settings
-        # Add other environment variables as needed
