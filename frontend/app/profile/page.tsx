@@ -1,11 +1,11 @@
 "use client"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon, ChartNoAxesColumnDecreasingIcon } from "lucide-react"
+import { Heart, ImageIcon, Download, Grid, Bookmark, Edit, Share2, LinkIcon } from "lucide-react"
 import {
   handleProfileClick,
   loadAllUploadedImages,
@@ -19,9 +19,9 @@ import EditCollectionModal from "@/components/modal/collections/edit-collection-
 import CollectionImagesModal from "@/components/modal/collections/collection-images-modal"
 import FollowsModal from "@/components/modal/follow/follow-modal"
 import ToastNotification from "@/components/modal/message-modal"
-import { set } from "date-fns"
 
-export default function Profile() {
+// Tạo component ProfileContent riêng biệt để bọc các hooks search params
+function ProfileContent() {
   // chỗ này được dùng để set mấy cái toast
   const [toastOpen, setToastOpen] = useState(false)
   const [toastVariant, setToastVariant] = useState<"success" | "error" | "info" | "warning">("success")
@@ -537,5 +537,18 @@ export default function Profile() {
         duration={toastMessage.duration}
       />
     </div>
+  )
+}
+
+// Component chính với Suspense boundary
+export default function Profile() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen pt-16 flex items-center justify-center">
+        <div className="animate-pulse text-primary">Loading profile...</div>
+      </div>
+    }>
+      <ProfileContent />
+    </Suspense>
   )
 }
