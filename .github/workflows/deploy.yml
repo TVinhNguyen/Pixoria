@@ -39,6 +39,7 @@ jobs:
         cache-to: type=registry,ref=${{ secrets.DOCKER_HUB_USERNAME }}/pixoria-frontend:buildcache,mode=max
         build-args: |
           NEXT_PUBLIC_API_BASE_URL=https://${{ secrets.DOMAIN_OR_IP }}/api
+          
     # Deploy to EC2
     - name: Deploy to AWS EC2
       uses: appleboy/ssh-action@v1
@@ -48,14 +49,12 @@ jobs:
         key: ${{ secrets.AWS_EC2_SSH_KEY }}
         port: 22
         script: |
-          # Tạo thư mục cho dự án nếu chưa tồn tại
           mkdir -p ~/pixoria
           cd ~/pixoria
           
-          # Sao chép file docker-compose.production.yml từ repo
+          # Tải xuống các file cấu hình mới nhất
           curl -o docker-compose.yml https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.production.yml
           
-          # Tạo thư mục nginx và file cấu hình
           mkdir -p ~/pixoria/nginx
           curl -o ~/pixoria/nginx/nginx.conf https://raw.githubusercontent.com/${{ github.repository }}/main/nginx/nginx.conf
           
@@ -65,14 +64,13 @@ jobs:
           export DOMAIN_OR_IP="${{ secrets.DOMAIN_OR_IP }}"
           export REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}"
           
-          # Biến môi trường AWS S3
           export AWS_USE_S3="${{ secrets.AWS_USE_S3 }}"
           export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
           export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
           export AWS_S3_BUCKET_NAME="${{ secrets.AWS_S3_BUCKET_NAME }}"
           export AWS_S3_REGION_NAME="${{ secrets.AWS_S3_REGION_NAME }}"
           
-          # Tạo swap file nếu chưa có (cần thiết cho t2.micro với CLIP model)
+          # Thiết lập swapfile nếu chưa có
           if [ ! -f /swapfile ]; then
             sudo dd if=/dev/zero of=/swapfile bs=128M count=16
             sudo chmod 600 /swapfile
@@ -81,40 +79,48 @@ jobs:
             echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
           fi
           
-          # Tạo thư mục cho media, static và SSL
+          # Tạo các thư mục cần thiết
           mkdir -p ~/pixoria/mediafiles ~/pixoria/staticfiles ~/pixoria/clip_cache ~/pixoria/ssl
           
-          # Thiết lập SSL certificates nếu chưa có
+          # Thiết lập SSL nếu chưa có
           if [ ! -f ~/pixoria/ssl/fullchain.pem ] || [ ! -f ~/pixoria/ssl/privkey.pem ]; then
-            # Check if certbot is installed
             if ! command -v certbot &> /dev/null; then
               sudo apt-get update
               sudo apt-get install -y certbot
             fi
             
-            # Tạm dừng nginx nếu đang chạy để tránh xung đột port 80
             docker-compose down nginx || true
             
-            # Tạo SSL certificate với Let's Encrypt
             sudo certbot certonly --standalone --non-interactive --agree-tos --email ${{ secrets.ADMIN_EMAIL }} -d ${{ secrets.DOMAIN_OR_IP }}
             
-            # Sao chép certificates
             sudo cp /etc/letsencrypt/live/${{ secrets.DOMAIN_OR_IP }}/fullchain.pem ~/pixoria/ssl/
             sudo cp /etc/letsencrypt/live/${{ secrets.DOMAIN_OR_IP }}/privkey.pem ~/pixoria/ssl/
             sudo chown -R $USER:$USER ~/pixoria/ssl
           fi
           
-          # Pull images mới nhất và khởi động containers
+          # Xử lý đặc biệt cho nginx.conf để thay thế biến ${DOMAIN_OR_IP}
+          sed -i "s/\${DOMAIN_OR_IP}/${{ secrets.DOMAIN_OR_IP }}/g" ~/pixoria/nginx/nginx.conf
+          
+          # Đảm bảo Redis đang hoạt động đúng
+          docker-compose logs redis-server
+          
+          # Dọn dẹp images không dùng
+          docker image prune -af
+          
+          # Pull và chạy container
           docker-compose pull
           docker-compose up -d
           
-          # Đảm bảo quyền cho các thư mục
+          # Đảm bảo quyền thư mục đúng
           sudo chown -R $USER:$USER ~/pixoria/mediafiles
           sudo chown -R $USER:$USER ~/pixoria/staticfiles
           sudo chown -R $USER:$USER ~/pixoria/clip_cache
           
-          # Thiết lập cron job cho tự động làm mới SSL certificates
+          # Kiểm tra log sau khi khởi động
+          docker-compose logs backend | tail -n 50
+          
+          # Thiết lập cron job cho việc gia hạn SSL
           (crontab -l 2>/dev/null; echo "0 0 1 * * sudo certbot renew --quiet && sudo cp /etc/letsencrypt/live/${{ secrets.DOMAIN_OR_IP }}/fullchain.pem ~/pixoria/ssl/ && sudo cp /etc/letsencrypt/live/${{ secrets.DOMAIN_OR_IP }}/privkey.pem ~/pixoria/ssl/ && docker-compose -f ~/pixoria/docker-compose.yml restart nginx") | crontab -
           
-          # Kiểm tra trạng thái
+          # Hiển thị trạng thái các container
           docker-compose ps
