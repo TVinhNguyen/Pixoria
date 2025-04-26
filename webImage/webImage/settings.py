@@ -74,8 +74,15 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            # Format Redis URL with password if it exists
-            "hosts": [f"redis://{(':' + REDIS_PASSWORD + '@') if REDIS_PASSWORD else ''}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"],
+            # Format Redis URL theo cách đảm bảo kết nối an toàn hơn
+            "hosts": [
+                {
+                    "host": REDIS_HOST,
+                    "port": int(REDIS_PORT),
+                    "db": int(REDIS_DB),
+                    **({"password": REDIS_PASSWORD} if REDIS_PASSWORD else {})
+                }
+            ],
         },
     },
 }
