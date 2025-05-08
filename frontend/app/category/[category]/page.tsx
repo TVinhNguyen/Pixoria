@@ -11,6 +11,7 @@ export default function CategoryPage() {
   const params = useParams()
   const categoryName = params.category as string
   const [images, setImages] = useState([])
+  const [categoryData, setCategoryData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -25,7 +26,19 @@ export default function CategoryPage() {
         }
         
         const data = await response.json()
-        setImages(data)
+        
+        // Xử lý cả trường hợp API trả về mảng images hoặc đối tượng có thuộc tính images
+        if (Array.isArray(data)) {
+          setImages(data)
+        } else if (data && data.images) {
+          setImages(data.images)
+          if (data.category) {
+            setCategoryData(data.category)
+          }
+        } else {
+          console.error("Unexpected data format:", data)
+          throw new Error("Invalid data format received from API")
+        }
       } catch (error) {
         console.error("Error fetching category images:", error)
         setError("Failed to load images for this category")
@@ -43,13 +56,20 @@ export default function CategoryPage() {
     return category.charAt(0).toUpperCase() + category.slice(1)
   }
 
+  const getCategoryTitle = () => {
+    if (categoryData && categoryData.name) {
+      return categoryData.name
+    }
+    return formatCategoryTitle(categoryName)
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
       
       <main className="flex-grow container mx-auto px-4 pt-24 pb-12">
         <h1 className="text-3xl font-bold mb-8 text-center">
-          {formatCategoryTitle(categoryName)} Photos
+          {getCategoryTitle()} Photos
         </h1>
         
         {loading ? (
