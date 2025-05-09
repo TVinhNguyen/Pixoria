@@ -1,7 +1,7 @@
 import API_BASE_URL from "../api-config"
 
 export async function handleGetCollections() {
-    const response = await fetch(`${API_BASE_URL}/collections`, {
+    const response = await fetch(`${API_BASE_URL}/collections/`, {
         method: "GET",
         headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
