@@ -156,7 +156,7 @@ export async function getPopularUsers(limit = 5): Promise<UserProfile[]> {
 // Get user collections
 export async function getUserCollections(username?: string): Promise<Collection[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/collections`, {
+    const response = await fetch(`${API_BASE_URL}/collections/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -184,7 +184,7 @@ export async function getUserCollections(username?: string): Promise<Collection[
 // Get collection by ID
 export async function getCollectionById(collectionId: string): Promise<Collection | null> {
   try {
-    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}`, {
+    const response = await fetch(`${API_BASE_URL}/collections/${collectionId}/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
