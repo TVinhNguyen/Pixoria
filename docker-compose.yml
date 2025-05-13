@@ -1,4 +1,4 @@
-# version: '3.8'
+version: '3.8'
 
 services:
   redis-server:
@@ -15,6 +15,12 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./webImage/.env
+    environment:
+      - DEBUG=1
+      - DJANGO_ALLOWED_HOSTS=*,localhost,127.0.0.1
+      - REDIS_HOST=redis-server
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=ganhteamgg123
     volumes:
       - ./webImage:/app
       - clip-cache:/root/.cache/clip  
@@ -27,16 +33,21 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
     ports:
       - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules  
+      - /app/.next
     environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
       - WATCHPACK_POLLING=true  
     depends_on:
       - backend
+    command: sh -c "npm run dev"
 
 volumes:
   redis-data:
-  clip-cache:  
+  clip-cache:
