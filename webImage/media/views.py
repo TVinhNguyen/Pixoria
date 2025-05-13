@@ -284,6 +284,10 @@ class ImageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='category/(?P<category_id>[^/.]+)')
     def images_by_category(self, request, category_id=None):
         """Endpoint lấy ảnh theo category ID hoặc slug"""
+        # Explicitly set permission check to allow any access
+        self.permission_classes = [AllowAny]
+        self.check_permissions(request)
+        
         try:
             # Xác định nếu tham số là slug (string) hay ID (số)
             if category_id.isdigit():
