@@ -25,7 +25,8 @@ export default function Categories() {
       try {
         setIsLoading(true);
         const data = await handleGetCategories();
-        setCategories(data);
+        // Extract the results array from the response
+        setCategories(data.results || []);
       } catch (err) {
         console.error("Error fetching categories:", err);
         setError("Failed to load categories. Please try again later.");
