@@ -13,7 +13,11 @@ export async function handleGetImagesByCategory(categorySlug: string, page: numb
             throw new Error(`Failed to fetch images for category: ${response.status}`)
         }
         
-        return await response.json()
+        const data = await response.json()
+        
+        // Return the complete data object which includes:
+        // count, next, previous, and results (which contains category and images)
+        return data
     } catch (error) {
         console.error("Error fetching category images:", error)
         throw error
