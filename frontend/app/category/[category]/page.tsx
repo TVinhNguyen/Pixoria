@@ -41,12 +41,12 @@ export default function CategoryPage() {
         const response = await handleGetImagesByCategory(categorySlug)
         
         // Handle the paginated response structure
-        if (response && response.results) {
-          if (response.results.category) {
+        if (response) {
+          if (response.results && response.results.category) {
             setCategoryData(response.results.category)
           }
           
-          if (response.results.images) {
+          if (response.results && response.results.images) {
             setImages(response.results.images)
           }
         } else {
