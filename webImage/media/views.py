@@ -250,9 +250,35 @@ class ImageViewSet(viewsets.ModelViewSet):
     def user_images(self, request, username=None):
         """API để lấy tất cả ảnh của một user theo username"""
         user = get_object_or_404(UserProfile, user__username=username)
-        images = Image.objects.filter(user=user)
-
-        serializer = self.get_serializer(images, many=True)
+        
+        # Apply filters
+        queryset = Image.objects.filter(user=user).select_related('user', 'user__user')
+        
+        # Filter by public/private if specified
+        visibility = request.query_params.get('visibility')
+        if (visibility == 'public'):
+            queryset = queryset.filter(is_public=True)
+        elif (visibility == 'private' and request.user.is_authenticated and request.user.username == username):
+            queryset = queryset.filter(is_public=False)
+        elif (not request.user.is_authenticated or request.user.username != username):
+            # For others, only show public images
+            queryset = queryset.filter(is_public=True)
+        
+        # Apply sorting
+        sort_by = request.query_params.get('sort', 'created_at')
+        order = request.query_params.get('order', 'desc')
+        
+        if sort_by in ['created_at', 'likes', 'downloads']:
+            sort_field = f"{'-' if order == 'desc' else ''}{sort_by}"
+            queryset = queryset.order_by(sort_field)
+        
+        # Use pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=False, permission_classes=[AllowAny])
