@@ -6,9 +6,6 @@ export async function handleGetImagesByCategory(categorySlug: string, page: numb
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
-                Authorization: typeof window !== 'undefined' && localStorage.getItem("token") 
-                    ? `Bearer ${localStorage.getItem("token")}` 
-                    : "",
             },
         })
         

@@ -5,62 +5,71 @@ import { useParams } from "next/navigation"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import ImageGrid from "@/components/image-grid"
-import API_BASE_URL from "@/lib/api-config"
+import { handleGetCategoryBySlug, handleGetImagesByCategory } from "@/lib/api-action/api-categories"
+import { ImageData } from "@/hooks/use-FetchImages"
+
+interface CategoryResponse {
+  id: number
+  name: string
+  slug: string
+}
+
+interface CategoryImagesResponse {
+  count: number
+  next: string | null
+  previous: string | null
+  results: {
+    category: CategoryResponse
+    images: ImageData[]
+  }
+}
 
 export default function CategoryPage() {
   const params = useParams()
-  const categoryName = params.category as string
-  const [images, setImages] = useState([])
-  const [categoryData, setCategoryData] = useState(null)
+  const categorySlug = params.category as string
+  const [images, setImages] = useState<ImageData[]>([])
+  const [categoryData, setCategoryData] = useState<CategoryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    async function fetchCategoryImages() {
+    async function fetchCategoryData() {
       try {
         setLoading(true)
-        const response = await fetch(`${API_BASE_URL}/images/category/${categoryName}/`)
         
-        if (!response.ok) {
-          throw new Error("Failed to fetch category images")
-        }
+        // Get category images using handleGetImagesByCategory function
+        const response = await handleGetImagesByCategory(categorySlug)
         
-        const data = await response.json()
-        
-        // Xử lý cả trường hợp API trả về mảng images hoặc đối tượng có thuộc tính images
-        if (Array.isArray(data)) {
-          setImages(data)
-        } else if (data && data.images) {
-          setImages(data.images)
-          if (data.category) {
-            setCategoryData(data.category)
+        // Handle the paginated response structure
+        if (response && response.results) {
+          if (response.results.category) {
+            setCategoryData(response.results.category)
+          }
+          
+          if (response.results.images) {
+            setImages(response.results.images)
           }
         } else {
-          console.error("Unexpected data format:", data)
           throw new Error("Invalid data format received from API")
         }
       } catch (error) {
-        console.error("Error fetching category images:", error)
-        setError("Failed to load images for this category")
+        console.error("Error fetching category data:", error)
+        setError("Failed to load data for this category")
       } finally {
         setLoading(false)
       }
     }
 
-    if (categoryName) {
-      fetchCategoryImages()
+    if (categorySlug) {
+      fetchCategoryData()
     }
-  }, [categoryName])
-
-  const formatCategoryTitle = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1)
-  }
+  }, [categorySlug])
 
   const getCategoryTitle = () => {
     if (categoryData && categoryData.name) {
       return categoryData.name
     }
-    return formatCategoryTitle(categoryName)
+    return categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1)
   }
 
   return (
@@ -83,7 +92,7 @@ export default function CategoryPage() {
             <p className="text-xl text-gray-500">No images found in this category</p>
           </div>
         ) : (
-          <ImageGrid images={images} />
+          <ImageGrid imagesPerPage={20} searchResults={images} />
         )}
       </main>
       

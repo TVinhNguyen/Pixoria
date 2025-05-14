@@ -144,7 +144,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     queryset = Image.objects.all()
     
     def get_permissions(self):
-        if self.action in ["public_images", "list", "search_similar", "user_images", "retrieve"]:  
+        if self.action in ["public_images","images_by_category", "list", "search_similar", "user_images", "retrieve"]:  
             return [AllowAny()]
         return [IsAuthenticated()]
 
@@ -284,9 +284,9 @@ class ImageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='category/(?P<category_id>[^/.]+)')
     def images_by_category(self, request, category_id=None):
         """Endpoint lấy ảnh theo category ID hoặc slug"""
-        # Explicitly set permission check to allow any access
-        self.permission_classes = [AllowAny]
-        self.check_permissions(request)
+        # # Make sure permission is properly applied for this specific view by overriding get_permissions
+        # self.permission_classes = [AllowAny]
+        # self.check_permissions(request)
         
         try:
             # Xác định nếu tham số là slug (string) hay ID (số)
