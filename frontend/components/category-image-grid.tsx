@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { type ImageData } from "../hooks/use-FetchImages"
 import { handleLike, handleDownload } from "@/lib/api-action/image-actions"
 import { handleGetImagesByCategory } from "@/lib/api-action/api-categories"
@@ -28,6 +28,7 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const observer = useRef<IntersectionObserver | null>(null)
   
   // Collection modal state
   const [collectionModalOpen, setCollectionModalOpen] = useState(false)
@@ -48,6 +49,23 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
     setToastMessage({ title, description, duration })
     setToastOpen(true)
   }
+
+  // Observer for infinite scrolling
+  const lastImageElementRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (loading) return
+      if (observer.current) observer.current.disconnect()
+
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setCurrentPage((prev) => prev + 1)
+        }
+      })
+
+      if (node) observer.current.observe(node)
+    },
+    [loading, hasMore]
+  )
 
   // Fetch images for the category
   useEffect(() => {
@@ -94,13 +112,6 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
       fetchCategoryImages()
     }
   }, [categorySlug, currentPage, imagesPerPage])
-
-  // Load more images when user clicks the load more button
-  const handleLoadMore = () => {
-    if (hasMore && !loading) {
-      setCurrentPage(prev => prev + 1)
-    }
-  }
 
   // Handling like functionality
   const handleImageLike = async (imageId: number) => {
@@ -220,6 +231,7 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
             columnClassName="bg-clip-padding px-2"
           >
             {images.map((image, index) => {
+              const isLastElement = index === images.length - 1
               const imageSrc = image.file || image.src || ""
 
               const author = image.author || {
@@ -236,6 +248,7 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
                 <div
                   key={`${image.id}-${index}`}
                   className="mb-4 group relative overflow-hidden"
+                  ref={isLastElement ? lastImageElementRef : undefined}
                 >
                   <div className="aspect-auto rounded-lg overflow-hidden">
                     <Image
@@ -322,28 +335,8 @@ export default function CategoryImageGrid({ categorySlug, imagesPerPage = 20 }: 
           </Masonry>
         )}
 
-        {/* Load more button */}
-        {images.length > 0 && hasMore && (
-          <div className="flex justify-center mt-8">
-            <Button 
-              onClick={handleLoadMore}
-              disabled={loading}
-              className="px-6 py-2"
-            >
-              {loading ? (
-                <>
-                  <span className="mr-2">Loading...</span>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                </>
-              ) : (
-                'Load More'
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* Loading indicator when fetching more images */}
-        {loading && images.length > 0 && !hasMore && (
+        {/* Loading spinner for infinite scroll */}
+        {loading && images.length > 0 && (
           <div className="flex justify-center my-8">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
