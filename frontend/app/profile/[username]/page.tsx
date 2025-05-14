@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Globe, Facebook, Instagram, Calendar, Grid, Bookmark, Heart, Eye, Lock, Loader2 } from "lucide-react"
+import { Globe, Facebook, Instagram, Calendar, Grid, Bookmark, Heart, Eye, Lock, Loader2, ChevronDown } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
@@ -45,6 +45,10 @@ interface Collection {
   created_at: string
 }
 
+// Constants for pagination
+const PHOTOS_PER_PAGE = 15;
+const COLLECTIONS_PER_PAGE = 9;
+
 export default function ProfilePage() {
   const params = useParams()
   const router = useRouter()
@@ -55,18 +59,32 @@ export default function ProfilePage() {
   const [photos, setPhotos] = useState<UserPhoto[]>([])
   const [collections, setCollections] = useState<Collection[]>([])
   const [suggestedProfiles, setSuggestedProfiles] = useState<UserProfile[]>([])
-  const [loading, setLoading] = useState(true)
+  
+  // Separate loading states
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [photosLoading, setPhotosLoading] = useState(true)
+  const [collectionsLoading, setCollectionsLoading] = useState(true)
+  
   const [error, setError] = useState<string | null>(null)
   const [isFollowing, setIsFollowing] = useState(false)
   const [followLoading, setFollowLoading] = useState(false)
   const [currentUserUsername, setCurrentUserUsername] = useState<string | null>(null)
   const [isCollectionImagesOpen, setIsCollectionImagesOpen] = useState(false)
   const [selectedCollectionId, setSelectedCollectionId] = useState<any>(null)
+  
+  // Pagination states
+  const [photoPage, setPhotoPage] = useState(1)
+  const [collectionPage, setCollectionPage] = useState(1)
+  const [hasMorePhotos, setHasMorePhotos] = useState(true)
+  const [hasMoreCollections, setHasMoreCollections] = useState(true)
+  const [loadingMorePhotos, setLoadingMorePhotos] = useState(false)
+  const [loadingMoreCollections, setLoadingMoreCollections] = useState(false)
+  const [totalPhotoCount, setTotalPhotoCount] = useState(0)
 
-  // Function to fetch user photos for the profile being viewed (not the logged-in user)
-  const fetchUserPhotos = async (username: string): Promise<UserPhoto[]> => {
+  // Function to fetch user photos with pagination
+  const fetchUserPhotos = useCallback(async (username: string, page: number = 1): Promise<{photos: UserPhoto[], hasMore: boolean, total: number}> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/images/user/${username}/`, {
+      const response = await fetch(`${API_BASE_URL}/images/user/${username}/?page=${page}&page_size=${PHOTOS_PER_PAGE}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem("token")}`,
@@ -74,13 +92,16 @@ export default function ProfilePage() {
       });
       
       if (!response.ok) {
-        return [];
+        return { photos: [], hasMore: false, total: 0 };
       }
       
       const data = await response.json();
+      const results = data.results || data;
+      const total = data.count || results.length;
+      const hasMore = data.next !== null;
       
       // Convert API response to UserPhoto format
-      return data.map((photo: any) => ({
+      const formattedPhotos = results.map((photo: any) => ({
         id: photo.id.toString(),
         imageUrl: photo.file || photo.image,
         title: photo.title || "Untitled",
@@ -90,30 +111,110 @@ export default function ProfilePage() {
         width: photo.width || 400,
         height: photo.height || 300,
       }));
+      
+      return { 
+        photos: formattedPhotos, 
+        hasMore,
+        total
+      };
     } catch (error) {
       console.error("Error fetching user photos:", error);
-      return [];
+      return { photos: [], hasMore: false, total: 0 };
+    }
+  }, []);
+
+  // Function to fetch collections with pagination
+  const fetchUserCollections = useCallback(async (username: string, page: number = 1): Promise<{collections: Collection[], hasMore: boolean}> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/profile/${username}/collections/?page=${page}&page_size=${COLLECTIONS_PER_PAGE}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      
+      if (!response.ok) {
+        return { collections: [], hasMore: false };
+      }
+      
+      const data = await response.json();
+      const results = data.results || data;
+      const hasMore = data.next !== null;
+      
+      return { 
+        collections: results, 
+        hasMore
+      };
+    } catch (error) {
+      console.error("Error fetching user collections:", error);
+      return { collections: [], hasMore: false };
+    }
+  }, []);
+
+  // Load more photos
+  const loadMorePhotos = async () => {
+    if (!hasMorePhotos || loadingMorePhotos) return;
+    
+    setLoadingMorePhotos(true);
+    try {
+      const nextPage = photoPage + 1;
+      const { photos: newPhotos, hasMore } = await fetchUserPhotos(username, nextPage);
+      
+      setPhotos(prev => [...prev, ...newPhotos]);
+      setPhotoPage(nextPage);
+      setHasMorePhotos(hasMore);
+    } catch (error) {
+      console.error("Error loading more photos:", error);
+    } finally {
+      setLoadingMorePhotos(false);
+    }
+  };
+
+  // Load more collections
+  const loadMoreCollections = async () => {
+    if (!hasMoreCollections || loadingMoreCollections) return;
+    
+    setLoadingMoreCollections(true);
+    try {
+      const nextPage = collectionPage + 1;
+      const { collections: newCollections, hasMore } = await fetchUserCollections(username, nextPage);
+      
+      setCollections(prev => [...prev, ...newCollections]);
+      setCollectionPage(nextPage);
+      setHasMoreCollections(hasMore);
+    } catch (error) {
+      console.error("Error loading more collections:", error);
+    } finally {
+      setLoadingMoreCollections(false);
     }
   };
 
   useEffect(() => {
     async function loadProfileData() {
-      setLoading(true)
+      setProfileLoading(true)
+      setPhotosLoading(true)
+      setCollectionsLoading(true)
       setError(null)
 
       try {
-        // Load profile data
-        const profileData = await handleProfileClick(username)
-        
-        if (!profileData) {
-          setError("User not found")
-          setLoading(false)
-          return
-        }
-
         // Get the current user's username from localStorage
         const currentUser = localStorage.getItem("username")
         setCurrentUserUsername(currentUser)
+
+        // Parallel data fetching for better performance
+        const [profileDataPromise, photosDataPromise, collectionsDataPromise] = [
+          handleProfileClick(username),
+          fetchUserPhotos(username),
+          fetchUserCollections(username)
+        ]
+
+        // Load profile data
+        const profileData = await profileDataPromise
+        
+        if (!profileData) {
+          setError("User not found")
+          return
+        }
 
         // Convert API response to UserProfile format
         setProfile({
@@ -130,40 +231,47 @@ export default function ProfilePage() {
           joinedDate: new Date(profileData.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
           socialLink: profileData.social_link || null
         })
+        setProfileLoading(false)
 
         // Check if the current user is following this profile
         if (currentUser && currentUser !== username && localStorage.getItem("profile_id")) {
-          try {
-            const followStatus = await checkFollowStatus(parseInt(localStorage.getItem("profile_id") || "0"))
-            setIsFollowing(followStatus)
-          } catch (error) {
-            console.error("Error checking follow status:", error)
-          }
+          checkFollowStatus(parseInt(localStorage.getItem("profile_id") || "0"))
+            .then(followStatus => setIsFollowing(followStatus))
+            .catch(error => console.error("Error checking follow status:", error))
         }
 
-        // Load user photos for the profile being viewed, not the logged-in user
-        const photosData = await fetchUserPhotos(username);
-        setPhotos(photosData);
+        // Load user photos with pagination
+        const { photos: photosData, hasMore: hasMorePhotos, total } = await photosDataPromise
+        setPhotos(photosData)
+        setHasMorePhotos(hasMorePhotos)
+        setTotalPhotoCount(total)
+        setPhotosLoading(false)
         
-        // Load user collections
-        const collectionsResponse = await handleGetCollectionByUsername(username)
-        const collectionsData = collectionsResponse.results || collectionsResponse
+        // Load user collections with pagination
+        const { collections: collectionsData, hasMore: hasMoreCollections } = await collectionsDataPromise
         setCollections(collectionsData)
+        setHasMoreCollections(hasMoreCollections)
         
-        // Load suggested // profiles
-  // const popularUsers = await getPopular// Users(3)
-  // const filteredUsers = popularUsers.filter(user => user.username !== u// sername)
-  // setSuggestedProfiles(filteredUsers)
+        // Update total collections count in profile
+        if (profile) {
+          setProfile(prev => prev ? {
+            ...prev,
+            totalCollections: collectionsData.length
+          } : null)
+        }
+        setCollectionsLoading(false)
+
       } catch (err) {
         console.error("Error loading profile:", err)
         setError("Failed to load profile data")
-      } finally {
-        setLoading(false)
+        setProfileLoading(false)
+        setPhotosLoading(false)
+        setCollectionsLoading(false)
       }
     }
 
     loadProfileData()
-  }, [username])
+  }, [username, fetchUserPhotos, fetchUserCollections])
 
   // Handle follow/unfollow action
   const handleFollowAction = async () => {
@@ -227,7 +335,7 @@ export default function ProfilePage() {
   }
 
   // Handle profile not found or error
-  if (!loading && (error || !profile)) {
+  if (!profileLoading && (error || !profile)) {
     return (
       <>
         <Header />
@@ -256,7 +364,7 @@ export default function ProfilePage() {
       <main className="min-h-screen pt-16 bg-gray-50 dark:bg-gray-900">
         {/* Cover Image */}
         <div className="relative w-full h-64 md:h-80 overflow-hidden">
-          {loading ? (
+          {profileLoading ? (
             <Skeleton className="w-full h-full" />
           ) : (
             <Image
@@ -274,7 +382,7 @@ export default function ProfilePage() {
           <div className="flex flex-col md:flex-row gap-6 -mt-16 md:-mt-20">
             {/* Avatar */}
             <div className="relative w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 shadow-lg mx-auto md:mx-0">
-              {loading ? (
+              {profileLoading ? (
                 <Skeleton className="w-full h-full rounded-full" />
               ) : (
                 <Image
@@ -289,7 +397,7 @@ export default function ProfilePage() {
 
             {/* Profile Details */}
             <div className="flex-1 text-center md:text-left pt-4 md:pt-20">
-              {loading ? (
+              {profileLoading ? (
                 <>
                   <Skeleton className="h-8 w-48 mb-2 mx-auto md:mx-0" />
                   <Skeleton className="h-4 w-72 mb-4 mx-auto md:mx-0" />
@@ -304,7 +412,7 @@ export default function ProfilePage() {
 
             {/* Follow Button */}
             <div className="flex justify-center md:justify-end items-start pt-4 md:pt-20">
-              {loading ? (
+              {profileLoading ? (
                 <Skeleton className="h-10 w-24" />
               ) : currentUserUsername && currentUserUsername !== username ? (
                 <Button 
@@ -335,7 +443,7 @@ export default function ProfilePage() {
           {/* Bio and Stats */}
           <div className="mt-6 md:mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
-              {loading ? (
+              {profileLoading ? (
                 <>
                   <Skeleton className="h-4 w-full mb-2" />
                   <Skeleton className="h-4 w-3/4 mb-2" />
@@ -367,7 +475,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-center">
-              {loading ? (
+              {profileLoading ? (
                 <>
                   <Skeleton className="h-16 rounded-lg" />
                   <Skeleton className="h-16 rounded-lg" />
@@ -385,7 +493,7 @@ export default function ProfilePage() {
                     <div className="text-sm text-gray-600 dark:text-gray-400">Following</div>
                   </div>
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold">{profile?.totalPhotos.toLocaleString()}</div>
+                    <div className="text-2xl font-bold">{totalPhotoCount.toLocaleString()}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">Photos</div>
                   </div>
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
@@ -412,7 +520,7 @@ export default function ProfilePage() {
               </TabsList>
 
               <TabsContent value="photos" className="mt-6">
-                {loading ? (
+                {photosLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {Array.from({ length: 6 }).map((_, i) => (
                       <Skeleton key={i} className="w-full h-64 rounded-lg" />
@@ -423,46 +531,72 @@ export default function ProfilePage() {
                     <p className="text-gray-600 dark:text-gray-400">No photos yet</p>
                   </div>
                 ) : (
-                  <Masonry
-                    breakpointCols={{
-                      default: 3,
-                      1100: 3,
-                      700: 2,
-                      500: 1,
-                    }}
-                    className="flex w-auto"
-                    columnClassName="bg-clip-padding px-2"
-                  >
-                    {photos.map((photo) => (
-                      <div key={photo.id} className="mb-4 group relative overflow-hidden rounded-lg">
-                        <Image
-                          src={photo.imageUrl || "/placeholder.svg"}
-                          width={photo.width}
-                          height={photo.height}
-                          alt={photo.title}
-                          className="w-full h-auto rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100">
-                          <h3 className="text-white font-medium">{photo.title}</h3>
-                          <div className="flex items-center gap-4 mt-2 text-white text-sm">
-                            <span className="flex items-center gap-1">
-                              <Heart className="h-4 w-4" />
-                              {photo.likes}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Eye className="h-4 w-4" />
-                              {photo.views}
-                            </span>
+                  <>
+                    <Masonry
+                      breakpointCols={{
+                        default: 3,
+                        1100: 3,
+                        700: 2,
+                        500: 1,
+                      }}
+                      className="flex w-auto"
+                      columnClassName="bg-clip-padding px-2"
+                    >
+                      {photos.map((photo) => (
+                        <div key={photo.id} className="mb-4 group relative overflow-hidden rounded-lg">
+                          <Image
+                            src={photo.imageUrl || "/placeholder.svg"}
+                            width={photo.width}
+                            height={photo.height}
+                            alt={photo.title}
+                            className="w-full h-auto rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-300 flex flex-col justify-end p-4 opacity-0 group-hover:opacity-100">
+                            <h3 className="text-white font-medium">{photo.title}</h3>
+                            <div className="flex items-center gap-4 mt-2 text-white text-sm">
+                              <span className="flex items-center gap-1">
+                                <Heart className="h-4 w-4" />
+                                {photo.likes}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Eye className="h-4 w-4" />
+                                {photo.views}
+                              </span>
+                            </div>
                           </div>
                         </div>
+                      ))}
+                    </Masonry>
+                    
+                    {hasMorePhotos && (
+                      <div className="mt-8 text-center">
+                        <Button 
+                          variant="outline" 
+                          onClick={loadMorePhotos}
+                          disabled={loadingMorePhotos}
+                          className="mx-auto"
+                        >
+                          {loadingMorePhotos ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="mr-2 h-4 w-4" />
+                              Load More Photos
+                            </>
+                          )}
+                        </Button>
                       </div>
-                    ))}
-                  </Masonry>
+                    )}
+                  </>
                 )}
               </TabsContent>
 
               <TabsContent value="collections" className="mt-6">
-                {loading ? (
+                {collectionsLoading ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <Skeleton key={i} className="w-full h-48 rounded-lg" />
@@ -473,27 +607,57 @@ export default function ProfilePage() {
                     <p className="text-gray-600 dark:text-gray-400">No collections yet</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                    {collections.map((collection) => (
-                      <div key={collection.id} className="group relative aspect-video overflow-hidden rounded-lg" onClick={() => {
-                        setIsCollectionImagesOpen(true)
-                        setSelectedCollectionId(collection.id)
-                      }}>
-                        <Image
-                          src={collection.cover_image || `/placeholder.svg?height=300&width=500`}
-                          alt={collection.name}
-                          width={500}
-                          height={300}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 p-4">
-                          <h3 className="text-lg font-bold text-white">{collection.name}</h3>
-                          <p className="text-sm text-gray-300">{collection.images.length} photos</p>
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                      {collections.map((collection) => (
+                        <div 
+                          key={collection.id} 
+                          className="group relative aspect-video overflow-hidden rounded-lg cursor-pointer" 
+                          onClick={() => {
+                            setIsCollectionImagesOpen(true)
+                            setSelectedCollectionId(collection.id)
+                          }}
+                        >
+                          <Image
+                            src={collection.cover_image || `/placeholder.svg?height=300&width=500`}
+                            alt={collection.name}
+                            width={500}
+                            height={300}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                          <div className="absolute bottom-0 left-0 right-0 p-4">
+                            <h3 className="text-lg font-bold text-white">{collection.name}</h3>
+                            <p className="text-sm text-gray-300">{collection.images.length} photos</p>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                    
+                    {hasMoreCollections && (
+                      <div className="mt-8 text-center">
+                        <Button 
+                          variant="outline" 
+                          onClick={loadMoreCollections}
+                          disabled={loadingMoreCollections}
+                          className="mx-auto"
+                        >
+                          {loadingMoreCollections ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="mr-2 h-4 w-4" />
+                              Load More Collections
+                            </>
+                          )}
+                        </Button>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </TabsContent>
             </Tabs>
