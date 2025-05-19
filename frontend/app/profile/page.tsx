@@ -16,6 +16,11 @@ import {
   LinkIcon
 } from 'lucide-react';
 import {
+  useQuery,
+  useQueryClient,
+  UseQueryResult
+} from '@tanstack/react-query';
+import {
   handleProfileClick,
   loadAllUploadedImages,
   loadAllLikedImages,
@@ -31,9 +36,15 @@ import CollectionImagesModal from '@/components/modal/collections/collection-ima
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 
-// Tạo component ProfileContent riêng biệt để bọc các hooks search params
+// Bữa sau nên tách ra thành 1 file riêng để có thể dùng lại, hơi rúi
+interface UserDetails {
+  id: number;
+  username: string;
+  display_name?: string;
+  avatar?: string;
+}
+
 function ProfileContent() {
-  // chỗ này được dùng để set mấy cái toast
   const [toastOpen, setToastOpen] = useState(false);
   const [toastVariant, setToastVariant] = useState<
     'success' | 'error' | 'info' | 'warning'
@@ -49,32 +60,131 @@ function ProfileContent() {
   const defaultTab = tabParams.get('tab') || 'photos';
   const [tab, setTab] = useState(defaultTab);
 
-  const [profileData, setProfileData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [userImages, setUserImages] = useState<any[]>([]);
-  const [collections, setCollections] = useState<any[]>([]);
-  const [collectionsLoading, setCollectionsLoading] = useState(false);
-  const [likedImages, setLikedImages] = useState<any[]>([]);
-  const [downloadedImages, setDownloadedImages] = useState<any[]>([]);
-  const [imagesLoading, setImagesLoading] = useState(false);
-  const [likedImagesLoading, setLikedImagesLoading] = useState(false);
-  const [downloadedImagesLoading, setDownloadedImagesLoading] = useState(false);
-
   const [selectedCollectionId, setSelectedCollectionId] = useState<
     number | null
   >(null);
   const [isEditCollectionModalOpen, setIsEditCollectionModalOpen] =
     useState(false);
   const [isCollectionImagesOpen, setIsCollectionImagesOpen] = useState(false);
-
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
-  const [followersList, setFollowersList] = useState<any[]>([]);
-  const [followingList, setFollowingList] = useState<any[]>([]);
-
-  // Lưu thông tin chỗ collection id để hiển thị ra và chỉnh sửa
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
+
+  const queryClient = useQueryClient();
+
+  //profile data
+  const {
+    data: profileData,
+    isLoading: profileLoading
+  }: UseQueryResult<any, Error> = useQuery({
+    queryKey: ['profile', localStorage.getItem('username') || 'guest'],
+    queryFn: () =>
+      handleProfileClick(localStorage.getItem('username') || 'guest'),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000
+  });
+
+  // Query cho user images
+  const {
+    data: userImages = [],
+    isLoading: imagesLoading
+  }: UseQueryResult<any[], Error> = useQuery({
+    queryKey: ['userImages'],
+    queryFn: loadAllUploadedImages,
+    enabled: tab === 'photos',
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Query cho collections
+  const {
+    data: collectionsData,
+    isLoading: collectionsLoading
+  }: UseQueryResult<{ results: Collection[] }, Error> = useQuery({
+    queryKey: ['collections'],
+    queryFn: handleGetCollections,
+    enabled: tab === 'collections',
+    staleTime: 5 * 60 * 1000
+  });
+
+  const collections = collectionsData?.results || [];
+
+  // Query cho liked images
+  const {
+    data: likedImages = [],
+    isLoading: likedImagesLoading
+  }: UseQueryResult<any[], Error> = useQuery({
+    queryKey: ['likedImages'],
+    queryFn: loadAllLikedImages,
+    enabled: tab === 'likes',
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Query cho downloaded images
+  const {
+    data: downloadedImages = [],
+    isLoading: downloadedImagesLoading
+  }: UseQueryResult<any[], Error> = useQuery({
+    queryKey: ['downloadedImages'],
+    queryFn: loadAllDownloadedImages,
+    enabled: tab === 'downloads',
+    staleTime: 5 * 60 * 1000
+  });
+
+  // Query cho collection data
+  const { data: collectionDataQuery }: UseQueryResult<Collection, Error> =
+    useQuery({
+      queryKey: ['collection', selectedCollectionId],
+      queryFn: () =>
+        handleGetCollectionById('', (selectedCollectionId || 0).toString()),
+      enabled: !!selectedCollectionId && isEditCollectionModalOpen
+    });
+
+  useEffect(() => {
+    if (collectionDataQuery) {
+      setCollectionData(collectionDataQuery);
+    }
+  }, [collectionDataQuery]);
+
+  // Query cho followers
+  const {
+    data: followersData = { followers: [] }
+  }: UseQueryResult<{ followers: UserDetails[] }, Error> = useQuery({
+    queryKey: ['followers', localStorage.getItem('user_id')],
+    queryFn: async () => {
+      const result = await getAllFollowers(
+        Number(localStorage.getItem('user_id'))
+      );
+      if (Array.isArray(result)) {
+        return { followers: result };
+      }
+      return result;
+    },
+    enabled: isFollowersOpen,
+    staleTime: 5 * 60 * 1000
+  });
+
+  const followersList = followersData.followers;
+
+  // Query cho following
+  const {
+    data: followingData = { followings: [] }
+  }: UseQueryResult<{ followings: UserDetails[] }, Error> = useQuery({
+    queryKey: ['following', localStorage.getItem('user_id')],
+    queryFn: async () => {
+      const result = await getAllFollowings(
+        Number(localStorage.getItem('user_id'))
+      );
+      if (Array.isArray(result)) {
+        return { followings: result };
+      }
+      return result;
+    },
+    enabled: isFollowingOpen,
+    staleTime: 5 * 60 * 1000
+  });
+
+  const followingList = followingData.followings || [];
 
   const setNotification = (
     variant: 'success' | 'error' | 'info' | 'warning',
@@ -87,125 +197,10 @@ function ProfileContent() {
     setToastOpen(true);
   };
 
-  const fetchProfile = async () => {
-    try {
-      const username = localStorage.getItem('username') || 'guest';
-      const data = await handleProfileClick(username);
-      setProfileData(data);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUserImages = async () => {
-    try {
-      setImagesLoading(true);
-      const data = await loadAllUploadedImages();
-      setUserImages(data);
-    } catch (error) {
-      console.error('Error fetching user images:', error);
-    } finally {
-      setImagesLoading(false);
-    }
-  };
-
-  const fetchCollections = async () => {
-    try {
-      const data = await handleGetCollections();
-      setCollections(data.results);
-    } catch (error) {
-      console.error('Error fetching user collections:', error);
-    } finally {
-      setCollectionsLoading(false);
-    }
-  };
-
-  const fetchCollectionData = async (collectionId: number) => {
-    try {
-      console.log('Fetching collection data for ID:', collectionId);
-      const data = await handleGetCollectionById('', collectionId.toString());
-      setCollectionData(data);
-    } catch (error) {
-      console.error('Error fetching collection data:', error);
-    }
-  };
-
-  const fetchUserLikedImages = async () => {
-    try {
-      setLikedImagesLoading(true);
-      const data = await loadAllLikedImages();
-      setLikedImages(data);
-    } catch (error) {
-      console.error('Error fetching user liked images:', error);
-    } finally {
-      setLikedImagesLoading(false);
-    }
-  };
-
-  const fetchUserDownloadedImages = async () => {
-    try {
-      setDownloadedImagesLoading(true);
-      const data = await loadAllDownloadedImages();
-      setDownloadedImages(data);
-    } catch (error) {
-      console.error('Error fetching user downloaded images:', error);
-    } finally {
-      setDownloadedImagesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
-
-  useEffect(() => {
-    fetchProfile();
-    fetchUserImages();
-    fetchCollections();
-    fetchUserLikedImages();
-    fetchUserDownloadedImages();
-  }, []);
-
-  useEffect(() => {
-    if (!isEditModalOpen) {
-      fetchProfile();
-    }
-  }, [isEditModalOpen]);
-
-  useEffect(() => {
-    if (!isEditCollectionModalOpen) {
-      fetchCollections();
-      setSelectedCollectionId(null);
-      setCollectionData(null);
-    }
-  }, [isEditCollectionModalOpen]);
-
-  useEffect(() => {
-    if (!isCollectionImagesOpen) {
-      fetchCollections();
-    }
-  }, [isCollectionImagesOpen]);
-
-  if (loading) {
-    return (
-      <div className='min-h-screen pt-16 flex items-center justify-center'>
-        <div className='animate-pulse text-primary'>Loading profile...</div>
-      </div>
-    );
-  }
-
+  // viết ri dùng được cho 4 tab, thay vì if else như cũ
   const handleTabChange = (value: string) => {
-    if (value === 'photos') {
-      fetchUserImages();
-    } else if (value === 'likes') {
-      fetchUserLikedImages();
-    } else if (value === 'downloads') {
-      fetchUserDownloadedImages();
-    } else if (value === 'collections') {
-      fetchCollections();
-    }
+    setTab(value);
+    router.push(`/profile?tab=${value}`);
   };
 
   const handleClickShare = () => {
@@ -220,46 +215,45 @@ function ProfileContent() {
   };
 
   const handleClickFollowing = () => {
-    console.log('Following clicked');
-    fetchFollowing();
     setIsFollowingOpen(true);
   };
 
   const handleClickFollowers = () => {
-    console.log('Followers clicked');
-    fetchFollowers();
     setIsFollowersOpen(true);
   };
 
-  const fetchFollowers = async () => {
-    try {
-      const mockFollowers = await getAllFollowers(
-        Number(localStorage.getItem('user_id'))
-      );
-      const followersArray =
-        !Array.isArray(mockFollowers) && Array.isArray(mockFollowers.followers)
-          ? mockFollowers.followers
-          : [];
-      setFollowersList(followersArray);
-    } catch (error) {
-      console.error('Error fetching followers:', error);
-    }
-  };
+  useEffect(() => {
+    setTab(defaultTab);
+  }, [defaultTab]);
 
-  const fetchFollowing = async () => {
-    try {
-      const mockFollowing = await getAllFollowings(
-        Number(localStorage.getItem('user_id'))
-      );
-      const followingArray =
-        !Array.isArray(mockFollowing) && Array.isArray(mockFollowing.followings)
-          ? mockFollowing.followings
-          : [];
-      setFollowingList(followingArray);
-    } catch (error) {
-      console.error('Error fetching following:', error);
+  useEffect(() => {
+    if (!isEditModalOpen) {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     }
-  };
+  }, [isEditModalOpen, queryClient]);
+
+  useEffect(() => {
+    if (!isEditCollectionModalOpen) {
+      setSelectedCollectionId(null);
+      setCollectionData(null);
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      queryClient.invalidateQueries({ queryKey: ['collection'] });
+    }
+  }, [isEditCollectionModalOpen, queryClient]);
+
+  useEffect(() => {
+    if (!isCollectionImagesOpen) {
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+    }
+  }, [isCollectionImagesOpen, queryClient]);
+
+  if (profileLoading) {
+    return (
+      <div className='min-h-screen pt-16 flex items-center justify-center'>
+        <div className='animate-pulse text-primary'>Loading profile...</div>
+      </div>
+    );
+  }
 
   return (
     <div className='min-h-screen pt-16'>
@@ -293,11 +287,9 @@ function ProfileContent() {
           <p className='text-muted-foreground'>
             @{profileData?.username || 'username'}
           </p>
-
           <p className='text-center max-w-md mt-2'>
             {profileData?.bio || 'No bio yet'}
           </p>
-
           <div className='flex items-center gap-2 mt-2'>
             {profileData?.social_link && (
               <Button variant='outline' size='sm' asChild>
@@ -323,7 +315,6 @@ function ProfileContent() {
               Edit Profile
             </Button>
           </div>
-
           <div className='flex justify-center gap-8 mt-4'>
             <div className='text-center'>
               <p className='text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
@@ -336,7 +327,7 @@ function ProfileContent() {
               onClick={handleClickFollowers}
             >
               <p className='text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
-                {profileData?.followers?.toLocaleString() || 0}
+                {(profileData?.followers || 0).toLocaleString()}
               </p>
               <p className='text-sm text-muted-foreground'>Followers</p>
             </div>
@@ -352,15 +343,7 @@ function ProfileContent() {
           </div>
         </div>
 
-        <Tabs
-          value={tab}
-          className='w-full'
-          onValueChange={value => {
-            setTab(value);
-            router.push(`/profile?tab=${value}`);
-            handleTabChange(value);
-          }}
-        >
+        <Tabs value={tab} className='w-full' onValueChange={handleTabChange}>
           <TabsList className='grid w-full grid-cols-4'>
             <TabsTrigger value='photos'>
               <ImageIcon className='mr-2 h-4 w-4' />
@@ -480,7 +463,6 @@ function ProfileContent() {
                         e.stopPropagation();
                         setSelectedCollectionId(collection.id);
                         setIsEditCollectionModalOpen(true);
-                        fetchCollectionData(collection.id);
                       }}
                       variant='ghost'
                       size='sm'
@@ -664,7 +646,6 @@ function ProfileContent() {
   );
 }
 
-// Component chính với Suspense boundary
 export default function Profile() {
   return (
     <Suspense
