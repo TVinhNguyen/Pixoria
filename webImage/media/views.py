@@ -144,7 +144,7 @@ class ImageViewSet(viewsets.ModelViewSet):
     queryset = Image.objects.all()
     
     def get_permissions(self):
-        if self.action in ["public_images", "list", "search_similar", "user_images", "retrieve"]:  
+        if self.action in ["public_images","images_by_category", "list", "search_similar", "user_images", "retrieve"]:  
             return [AllowAny()]
         return [IsAuthenticated()]
 
@@ -250,9 +250,35 @@ class ImageViewSet(viewsets.ModelViewSet):
     def user_images(self, request, username=None):
         """API để lấy tất cả ảnh của một user theo username"""
         user = get_object_or_404(UserProfile, user__username=username)
-        images = Image.objects.filter(user=user)
-
-        serializer = self.get_serializer(images, many=True)
+        
+        # Apply filters
+        queryset = Image.objects.filter(user=user).select_related('user', 'user__user')
+        
+        # Filter by public/private if specified
+        visibility = request.query_params.get('visibility')
+        if (visibility == 'public'):
+            queryset = queryset.filter(is_public=True)
+        elif (visibility == 'private' and request.user.is_authenticated and request.user.username == username):
+            queryset = queryset.filter(is_public=False)
+        elif (not request.user.is_authenticated or request.user.username != username):
+            # For others, only show public images
+            queryset = queryset.filter(is_public=True)
+        
+        # Apply sorting
+        sort_by = request.query_params.get('sort', 'created_at')
+        order = request.query_params.get('order', 'desc')
+        
+        if sort_by in ['created_at', 'likes', 'downloads']:
+            sort_field = f"{'-' if order == 'desc' else ''}{sort_by}"
+            queryset = queryset.order_by(sort_field)
+        
+        # Use pagination
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=False, permission_classes=[AllowAny])
@@ -284,6 +310,10 @@ class ImageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], url_path='category/(?P<category_id>[^/.]+)')
     def images_by_category(self, request, category_id=None):
         """Endpoint lấy ảnh theo category ID hoặc slug"""
+        # # Make sure permission is properly applied for this specific view by overriding get_permissions
+        # self.permission_classes = [AllowAny]
+        # self.check_permissions(request)
+        
         try:
             # Xác định nếu tham số là slug (string) hay ID (số)
             if category_id.isdigit():

@@ -4,63 +4,49 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
-import ImageGrid from "@/components/image-grid"
-import API_BASE_URL from "@/lib/api-config"
+import CategoryImageGrid from "@/components/category-image-grid"
+import { handleGetCategoryBySlug } from "@/lib/api-action/api-categories"
+
+interface CategoryResponse {
+  id: number
+  name: string
+  slug: string
+}
 
 export default function CategoryPage() {
   const params = useParams()
-  const categoryName = params.category as string
-  const [images, setImages] = useState([])
-  const [categoryData, setCategoryData] = useState(null)
+  const categorySlug = params.category as string
+  const [categoryData, setCategoryData] = useState<CategoryResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
 
   useEffect(() => {
-    async function fetchCategoryImages() {
+    async function fetchCategoryData() {
       try {
         setLoading(true)
-        const response = await fetch(`${API_BASE_URL}/images/category/${categoryName}/`)
         
-        if (!response.ok) {
-          throw new Error("Failed to fetch category images")
-        }
+        // Only fetch the category details for the title
+        const response = await handleGetCategoryBySlug(categorySlug)
         
-        const data = await response.json()
-        
-        // Xử lý cả trường hợp API trả về mảng images hoặc đối tượng có thuộc tính images
-        if (Array.isArray(data)) {
-          setImages(data)
-        } else if (data && data.images) {
-          setImages(data.images)
-          if (data.category) {
-            setCategoryData(data.category)
-          }
-        } else {
-          console.error("Unexpected data format:", data)
-          throw new Error("Invalid data format received from API")
+        if (response) {
+          setCategoryData(response)
         }
       } catch (error) {
-        console.error("Error fetching category images:", error)
-        setError("Failed to load images for this category")
+        console.error("Error fetching category data:", error)
       } finally {
         setLoading(false)
       }
     }
 
-    if (categoryName) {
-      fetchCategoryImages()
+    if (categorySlug) {
+      fetchCategoryData()
     }
-  }, [categoryName])
-
-  const formatCategoryTitle = (category: string) => {
-    return category.charAt(0).toUpperCase() + category.slice(1)
-  }
+  }, [categorySlug])
 
   const getCategoryTitle = () => {
     if (categoryData && categoryData.name) {
       return categoryData.name
     }
-    return formatCategoryTitle(categoryName)
+    return categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1)
   }
 
   return (
@@ -72,19 +58,8 @@ export default function CategoryPage() {
           {getCategoryTitle()} Photos
         </h1>
         
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center text-red-500 py-8">{error}</div>
-        ) : images.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-xl text-gray-500">No images found in this category</p>
-          </div>
-        ) : (
-          <ImageGrid images={images} />
-        )}
+        {/* Use our specialized category image grid that directly handles the API calls */}
+        <CategoryImageGrid categorySlug={categorySlug} imagesPerPage={20} />
       </main>
       
       <Footer />
