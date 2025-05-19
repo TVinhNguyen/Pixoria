@@ -424,6 +424,7 @@ export default function ProfileEditModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
       <ToastNotification
         variant={toastVariant}
         title={toastMessage.title}

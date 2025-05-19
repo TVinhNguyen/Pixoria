@@ -21,6 +21,8 @@ import {
   loadAllLikedImages,
   loadAllDownloadedImages
 } from '@/lib/api-action/api-profile';
+import { handleGetCollectionById } from '@/lib/api-action/api-collection';
+import { Collection } from '@/components/modal/collections/edit-collection-modal';
 import { getAllFollowers, getAllFollowings } from '@/lib/api-action/api-follow';
 import { handleGetCollections } from '@/lib/api-action/api-collection';
 import ProfileEditModal from '@/components/modal/edit-profile-modal';
@@ -71,6 +73,9 @@ function ProfileContent() {
   const [followersList, setFollowersList] = useState<any[]>([]);
   const [followingList, setFollowingList] = useState<any[]>([]);
 
+  // Lưu thông tin chỗ collection id để hiển thị ra và chỉnh sửa
+  const [collectionData, setCollectionData] = useState<Collection | null>(null);
+
   const setNotification = (
     variant: 'success' | 'error' | 'info' | 'warning',
     title: string,
@@ -114,6 +119,16 @@ function ProfileContent() {
       console.error('Error fetching user collections:', error);
     } finally {
       setCollectionsLoading(false);
+    }
+  };
+
+  const fetchCollectionData = async (collectionId: number) => {
+    try {
+      console.log('Fetching collection data for ID:', collectionId);
+      const data = await handleGetCollectionById('', collectionId.toString());
+      setCollectionData(data);
+    } catch (error) {
+      console.error('Error fetching collection data:', error);
     }
   };
 
@@ -162,6 +177,8 @@ function ProfileContent() {
   useEffect(() => {
     if (!isEditCollectionModalOpen) {
       fetchCollections();
+      setSelectedCollectionId(null);
+      setCollectionData(null);
     }
   }, [isEditCollectionModalOpen]);
 
@@ -463,6 +480,7 @@ function ProfileContent() {
                         e.stopPropagation();
                         setSelectedCollectionId(collection.id);
                         setIsEditCollectionModalOpen(true);
+                        fetchCollectionData(collection.id);
                       }}
                       variant='ghost'
                       size='sm'
@@ -597,13 +615,15 @@ function ProfileContent() {
         />
       )}
 
-      {isEditCollectionModalOpen && selectedCollectionId != null && (
-        <EditCollectionModal
-          isOpen={isEditCollectionModalOpen}
-          onClose={() => setIsEditCollectionModalOpen(false)}
-          collectionId={selectedCollectionId}
-        />
-      )}
+      {isEditCollectionModalOpen &&
+        selectedCollectionId != null &&
+        collectionData && (
+          <EditCollectionModal
+            isOpen={isEditCollectionModalOpen}
+            onClose={() => setIsEditCollectionModalOpen(false)}
+            collectionFetchedData={collectionData}
+          />
+        )}
 
       {isCollectionImagesOpen && selectedCollectionId && (
         <CollectionImagesModal
