@@ -121,12 +121,12 @@ class Image(models.Model):
         # Lưu bình thường
         super().save(*args, **kwargs)
         self.user.update_counts()
-        
-        # Cache ảnh khi lưu
+          # Cache ảnh khi lưu
         from django.core.cache import cache
         cache_key = f'image:{self.id}'
         cache.set(cache_key, self, 60*60*24)  # Cache trong 24 giờ
-      def _add_to_indices(self):
+    
+    def _add_to_indices(self):
         """Thêm ảnh vào CLIP index tìm kiếm"""
         # Thêm vào CLIP index
         try:
