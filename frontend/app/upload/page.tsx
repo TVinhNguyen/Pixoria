@@ -27,7 +27,7 @@ export default function UploadPage() {
   // States for form inputs
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
-  const [selectedCategoryId, setSelectedCategoryId] = useState("")
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [tags, setTags] = useState("")
   const [isPublic, setIsPublic] = useState(true)
   
@@ -126,16 +126,16 @@ export default function UploadPage() {
       return
     }
 
-    if (!selectedCategoryId) {
-      toast.error("Please select a category for your images")
+    if (selectedCategoryIds.length === 0) {
+      toast.error("Please select at least one category for your images")
       return
     }
 
     setIsUploading(true)
     
     try {
-      // Tạo danh sách category IDs từ selectedCategoryId
-      const categoryIds = [parseInt(selectedCategoryId)]
+      // Tạo danh sách category IDs từ selectedCategoryIds
+      const categoryIds = selectedCategoryIds.map((id) => parseInt(id))
       
       // Gọi API để upload ảnh
       const response = await uploadImages(
@@ -154,7 +154,7 @@ export default function UploadPage() {
       setPreviews([])
       setTitle("")
       setDescription("")
-      setSelectedCategoryId("")
+      setSelectedCategoryIds([])
       setTags("")
       
       // Chuyển hướng đến trang chủ hoặc trang profile
@@ -273,30 +273,34 @@ export default function UploadPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="category">Category</Label>
+                  <Label htmlFor="category">Categories</Label>
                   {loading ? (
                     <div className="flex items-center space-x-2 text-gray-400 py-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       <span>Loading categories...</span>
                     </div>
-                  ) : (                    <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
-                      <SelectTrigger className="bg-gray-700 border-gray-600">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-gray-800 border-gray-700">
-                        {Array.isArray(categories) && categories.length > 0 ? (
-                          categories.map((category) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="no-categories" disabled>
-                            No categories available
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 py-2">
+                      {Array.isArray(categories) && categories.length > 0 ? (
+                        categories.map((category) => (
+                          <label key={category.id} className="flex items-center space-x-2 bg-gray-700 px-2 py-1 rounded cursor-pointer">
+                            <Checkbox
+                              checked={selectedCategoryIds.includes(category.id.toString())}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedCategoryIds((prev) => [...prev, category.id.toString()])
+                                } else {
+                                  setSelectedCategoryIds((prev) => prev.filter((id) => id !== category.id.toString()))
+                                }
+                              }}
+                            />
+                            <span>{category.name}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <span className="text-gray-400">No categories available</span>
+                      )}
+                    </div>
                   )}
                 </div>
 
