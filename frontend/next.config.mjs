@@ -19,6 +19,12 @@ const nextConfig = {
   },
   output: 'standalone',
   reactStrictMode: true,
+  poweredByHeader: false,
+  transpilePackages: ['@tanstack/react-query', 'react-router-dom', 'react-router'],
+  webpack: (config) => {
+    // Important: Return the modified config
+    return config;
+  },
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,

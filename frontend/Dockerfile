@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Add build arguments for environment variables
@@ -7,36 +7,49 @@ ARG NEXT_PUBLIC_API_BASE_URL
 # Set environment variables
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy package files and install dependencies
-COPY package.json package-lock.json ./
-RUN npm ci
+# Install necessary build tools
+RUN apk add --no-cache libc6-compat
 
-# Copy configuration files first (for better caching)
-COPY tailwind.config.ts postcss.config.mjs tsconfig.json next.config.mjs ./
-COPY components.json ./
-
-# Copy the rest of the application
+# Copy everything to build properly, path resolution issues require complete codebase
 COPY . .
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Verify autoprefixer is installed
+RUN npm list autoprefixer
 
 # Build the Next.js application
 RUN npm run build
 
-FROM node:18-alpine AS runner
+FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Install necessary runtime dependencies
+RUN apk add --no-cache libc6-compat
+
+# Add user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Set the correct permission for the /app directory
+RUN mkdir -p /app/.next/cache && \
+    chown -R nextjs:nodejs /app
 
 # Copy necessary files from builder stage
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy config files needed for runtime
-COPY --from=builder /app/tailwind.config.ts ./tailwind.config.ts
-COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
-COPY --from=builder /app/next.config.mjs ./next.config.mjs
+# Switch to non-root user
+USER nextjs
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+ENV PORT 3000
+
+CMD ["node", "server.js"]
