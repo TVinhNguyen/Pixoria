@@ -16,4 +16,5 @@ RUN python -c "import clip; clip.load('ViT-B/32')"
 COPY . .
 EXPOSE 8000
 # Replace gunicorn with daphne for ASGI support
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "webImage.asgi:application"]
+# CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "webImage.asgi:application"]
+CMD ["sh", "-c", "python manage.py runserver 0.0.0.0:8000"]
