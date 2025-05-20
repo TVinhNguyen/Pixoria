@@ -181,9 +181,25 @@ class ImageViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         """
-        Tự động gán người dùng hiện tại khi tạo ảnh mới
+        Tự động gán người dùng hiện tại khi tạo ảnh mới và xử lý danh mục
         """
-        serializer.save(user=self.request.user.userprofile)
+        # Lưu ảnh và gán cho người dùng hiện tại
+        image = serializer.save(user=self.request.user.userprofile)
+        
+        # Xử lý categories nếu có
+        categories = self.request.data.getlist('categories', [])
+        if categories:
+            for category_id in categories:
+                try:
+                    category = Category.objects.get(id=category_id)
+                    ImageCategory.objects.create(image=image, category=category)
+                except Category.DoesNotExist:
+                    # Có thể log lỗi hoặc bỏ qua nếu category không tồn tại
+                    pass
+                except Exception as e:
+                    print(f"Lỗi khi thêm danh mục {category_id} cho ảnh {image.id}: {str(e)}")
+        
+        return image
     def perform_destroy(self, instance):
         """
         Xoá ảnh trên AWS S3 trước khi xoá bản ghi trong database

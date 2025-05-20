@@ -1,3 +1,4 @@
+/* eslint-disable */
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
@@ -16,7 +17,14 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  experimental: {
+  output: 'standalone',
+  reactStrictMode: true,
+  poweredByHeader: false,
+  transpilePackages: ['@tanstack/react-query', 'react-router-dom', 'react-router'],
+  webpack: (config) => {
+    // Important: Return the modified config
+    return config;
+  },  experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,

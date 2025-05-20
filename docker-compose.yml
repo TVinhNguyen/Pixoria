@@ -28,7 +28,6 @@ services:
       - "8000:8000"
     depends_on:
       - redis-server
-
   frontend:
     build:
       context: ./frontend
@@ -41,9 +40,12 @@ services:
       - ./frontend:/app
       - /app/node_modules  
       - /app/.next
+      - /app/.swc
     environment:
+      - NODE_ENV=development
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-      - WATCHPACK_POLLING=true  
+      - WATCHPACK_POLLING=true
+      - TAILWIND_MODE=watch
     depends_on:
       - backend
     command: sh -c "npm run dev"
