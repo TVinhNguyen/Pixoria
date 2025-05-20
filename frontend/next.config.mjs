@@ -1,3 +1,4 @@
+/* eslint-disable */
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
@@ -16,6 +17,8 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  output: 'standalone',
+  reactStrictMode: true,
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,

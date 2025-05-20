@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -11,15 +11,55 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Upload, X, ImageIcon } from "lucide-react"
-
-const categories = ["Nature", "Travel", "Architecture", "Food", "Technology", "People", "Animals", "Sports"]
+import { Upload, X, ImageIcon, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { fetchCategories, uploadImages, type Category } from "@/lib/api-action/api-upload"
+import { Checkbox } from "@/components/ui/checkbox"
 
 export default function UploadPage() {
+  const router = useRouter()
   const [files, setFiles] = useState<File[]>([])
   const [previews, setPreviews] = useState<string[]>([])
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // States for form inputs
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [selectedCategoryId, setSelectedCategoryId] = useState("")
+  const [tags, setTags] = useState("")
+  const [isPublic, setIsPublic] = useState(true)
+  
+  // States for API data
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+    // Load categories from API
+  useEffect(() => {
+    async function loadCategories() {
+      setLoading(true)
+      try {
+        const data = await fetchCategories()
+        // Ensure categories is always an array
+        if (Array.isArray(data)) {
+          setCategories(data)
+        } else {
+          console.error("Categories is not an array:", data)
+          setCategories([])
+          toast.error("Invalid categories data format")
+        }
+      } catch (error) {
+        console.error("Error loading categories:", error)
+        toast.error("Failed to load categories")
+        setCategories([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadCategories()
+  }, [])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -76,34 +116,57 @@ export default function UploadPage() {
   }
 
   const handleUpload = async () => {
-    // Here you would implement the actual upload logic
-    // For example, using FormData and fetch to send to your API
-    alert(`Uploading ${files.length} images`)
+    if (files.length === 0) {
+      toast.error("Please select at least one image to upload")
+      return
+    }
 
-    // Example implementation (commented out):
-    /*
-    const formData = new FormData()
-    files.forEach(file => {
-      formData.append('images', file)
-    })
+    if (!title) {
+      toast.error("Please enter a title for your images")
+      return
+    }
+
+    if (!selectedCategoryId) {
+      toast.error("Please select a category for your images")
+      return
+    }
+
+    setIsUploading(true)
     
     try {
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      })
+      // Tạo danh sách category IDs từ selectedCategoryId
+      const categoryIds = [parseInt(selectedCategoryId)]
       
-      if (response.ok) {
-        // Handle success
-        setFiles([])
-        setPreviews([])
-      } else {
-        // Handle error
-      }
+      // Gọi API để upload ảnh
+      const response = await uploadImages(
+        files,
+        title,
+        description,
+        categoryIds,
+        isPublic,
+        tags
+      )
+      
+      toast.success(`Successfully uploaded ${files.length} ${files.length === 1 ? 'image' : 'images'}!`)
+      
+      // Reset form sau khi upload thành công
+      setFiles([])
+      setPreviews([])
+      setTitle("")
+      setDescription("")
+      setSelectedCategoryId("")
+      setTags("")
+      
+      // Chuyển hướng đến trang chủ hoặc trang profile
+      setTimeout(() => {
+        router.push("/")
+      }, 2000)
     } catch (error) {
-      console.error('Upload failed:', error)
+      console.error("Upload failed:", error)
+      toast.error("Failed to upload images. Please try again.")
+    } finally {
+      setIsUploading(false)
     }
-    */
   }
 
   return (
@@ -111,7 +174,7 @@ export default function UploadPage() {
       <header className="container mx-auto py-6">
         <nav className="flex justify-between items-center mb-8">
           <Link href="/" className="text-2xl font-bold text-purple-500">
-            ModernPexels
+            Pixoria
           </Link>
           <div className="space-x-4">
             <Button variant="ghost">Explore</Button>
@@ -190,7 +253,9 @@ export default function UploadPage() {
                   <Label htmlFor="title">Title</Label>
                   <Input
                     id="title"
-                    placeholder="Give your collection a title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Give your images a title"
                     className="bg-gray-700 border-gray-600"
                   />
                 </div>
@@ -199,6 +264,8 @@ export default function UploadPage() {
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     placeholder="Add a description for your images"
                     className="bg-gray-700 border-gray-600"
                     rows={3}
@@ -207,23 +274,50 @@ export default function UploadPage() {
 
                 <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select>
-                    <SelectTrigger className="bg-gray-700 border-gray-600">
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category.toLowerCase()}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {loading ? (
+                    <div className="flex items-center space-x-2 text-gray-400 py-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Loading categories...</span>
+                    </div>
+                  ) : (                    <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                      <SelectTrigger className="bg-gray-700 border-gray-600">
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700">
+                        {Array.isArray(categories) && categories.length > 0 ? (
+                          categories.map((category) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-categories" disabled>
+                            No categories available
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
 
                 <div>
                   <Label htmlFor="tags">Tags (separated by commas)</Label>
-                  <Input id="tags" placeholder="nature, landscape, mountains" className="bg-gray-700 border-gray-600" />
+                  <Input 
+                    id="tags" 
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="nature, landscape, mountains" 
+                    className="bg-gray-700 border-gray-600" 
+                  />
+                </div>
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox 
+                    id="public" 
+                    checked={isPublic}
+                    onCheckedChange={(checked) => setIsPublic(checked as boolean)} 
+                  />
+                  <Label htmlFor="public" className="cursor-pointer">Make public (visible to all users)</Label>
                 </div>
               </div>
             )}
@@ -231,8 +325,19 @@ export default function UploadPage() {
 
           {previews.length > 0 && (
             <CardFooter>
-              <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white" onClick={handleUpload}>
-                Upload {files.length} {files.length === 1 ? "Image" : "Images"}
+              <Button 
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white" 
+                onClick={handleUpload}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                    Uploading...
+                  </>
+                ) : (
+                  <>Upload {files.length} {files.length === 1 ? "Image" : "Images"}</>
+                )}
               </Button>
             </CardFooter>
           )}
