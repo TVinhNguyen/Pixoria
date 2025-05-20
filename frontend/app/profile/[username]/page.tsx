@@ -214,16 +214,14 @@ export default function ProfilePage() {
         if (!profileData) {
           setError("User not found")
           return
-        }
-
-        // Convert API response to UserProfile format
+        }        // Convert API response to UserProfile format
         setProfile({
           id: localStorage.getItem("profile_id") || "",
           username: profileData.username,
           displayName: profileData.display_name || profileData.username,
           bio: profileData.bio || "",
-          avatarUrl: profileData.avatar || "/placeholder-user.jpg",
-          coverImageUrl: "/placeholder.jpg",
+          avatarUrl: profileData.avatar || "/images/avatar.jpg",
+          coverImageUrl: "/images/background.jpg",
           followers: profileData.followers || 0,
           following: profileData.following || 0,
           totalPhotos: profileData.photos || 0,
