@@ -1,19 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { X, Bell, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  UseQueryOptions,
-  UseQueryResult,
-  UseMutationOptions,
-  UseMutationResult
-} from '@tanstack/react-query';
 import {
   handleNotificationClick,
   handleMarkedAllAsReadClick,
@@ -22,17 +13,17 @@ import {
 import { useNotificationSocket } from '@/hooks/use-notification-socket';
 
 const scrollbarStyles = `
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 5px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: rgba(155, 155, 155, 0.5);
-    border-radius: 20px;
-  }
-`;
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: rgba(155, 155, 155, 0.5);
+      border-radius: 20px;
+    }
+  `;
 
 interface NotificationData {
   id: number;
@@ -54,110 +45,123 @@ export default function NotificationModal({
   onClose
 }: NotificationModalProps) {
   const [activeTab, setActiveTab] = useState('all');
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [imageError, setImageError] = useState<Record<number, boolean>>({});
-  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  // Sử dụng hook WebSocket để nhận thông báo realtime
+  // websocket thì giữ nguyên
   const { hasNewNotification } = useNotificationSocket();
 
-  // Define query options with proper typing
-  const queryOptions: UseQueryOptions<NotificationData[], Error> = {
-    queryKey: ['notifications'],
-    queryFn: async () => {
-      const data = await handleNotificationClick();
-      return data as NotificationData[];
-    },
-    enabled: isOpen,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000 // Use gcTime instead of cacheTime (React Query v5 naming)
-    // onError: (error: Error) => {
-    //   if (
-    //     error.message.includes('Not authenticated') ||
-    //     error.message.includes('403')
-    //   ) {
-    //     console.warn('Bạn chưa đăng nhập — không thể lấy thông báo.');
-    //   } else {
-    //     console.error('Lỗi khi fetch thông báo:', error);
-    //   }
-    // }
-  };
+  useEffect(() => {
+    if (isOpen) {
+      setNotifications([]);
+      setPage(1);
+      setHasMore(true);
+      fetchNotifications(1);
+    }
+  }, [isOpen]);
 
-  // Query để fetch thông báo
-  const {
-    data: notifications = [],
-    isLoading
-  }: UseQueryResult<NotificationData[], Error> = useQuery(queryOptions);
-
-  // Làm mới query khi có thông báo mới từ WebSocket
+  // Tự động làm mới khi có thông báo mới
   useEffect(() => {
     if (isOpen && hasNewNotification) {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      setNotifications([]);
+      setPage(1);
+      setHasMore(true);
+      fetchNotifications(1);
     }
-  }, [isOpen, hasNewNotification, queryClient]);
+  }, [isOpen, hasNewNotification]);
 
-  // Mutation để đánh dấu tất cả là đã đọc
-  const markAllAsReadMutation: UseMutationResult<void, Error, void> =
-    useMutation({
-      mutationFn: handleMarkedAllAsReadClick,
-      onMutate: async () => {
-        await queryClient.cancelQueries({ queryKey: ['notifications'] });
-        const previousNotifications = queryClient.getQueryData<
-          NotificationData[]
-        >(['notifications']);
-        queryClient.setQueryData(
-          ['notifications'],
-          (old: NotificationData[] | undefined) =>
-            old?.map(n => ({ ...n, read: true }))
-        );
-        return { previousNotifications };
-      },
-      onError: (err: Error, _variables, context) => {
-        console.error('Error marking all notifications as read:', err);
-        queryClient.setQueryData(
-          ['notifications'],
-          context?.previousNotifications
-        );
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      }
-    });
+  // IntersectionObserver tải thêm dữ liệu, bằng cách kiểm tra hasmore
+  useEffect(() => {
+    if (!isOpen || isLoading || !hasMore) return;
 
-  // Mutation để đánh dấu một thông báo là đã đọc
-  const markAsReadMutation: UseMutationResult<void, Error, number> =
-    useMutation({
-      mutationFn: handleMarkAsRead,
-      onMutate: async (id: number) => {
-        await queryClient.cancelQueries({ queryKey: ['notifications'] });
-        const previousNotifications = queryClient.getQueryData<
-          NotificationData[]
-        >(['notifications']);
-        queryClient.setQueryData(
-          ['notifications'],
-          (old: NotificationData[] | undefined) =>
-            old?.map(n => (n.id === id ? { ...n, read: true } : n))
-        );
-        return { previousNotifications };
+    observerRef.current = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore) {
+          setPage(prev => prev + 1);
+        }
       },
-      onError: (err: Error, id: number, context) => {
-        console.error(`Error marking notification ${id} as read:`, err);
-        queryClient.setQueryData(
-          ['notifications'],
-          context?.previousNotifications
-        );
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
       }
-    });
+    };
+  }, [isOpen, isLoading, hasMore]);
+
+  useEffect(() => {
+    if (page > 1) {
+      fetchNotifications(page);
+    }
+  }, [page]);
+
+  const fetchNotifications = async (pageNum: number) => {
+    setIsLoading(true);
+    try {
+      const limit = 10; // 10 là số đẹp rồi, hắn fit vừa y cái trang
+      const data = await handleNotificationClick({ page: pageNum, limit });
+
+      // Nếu dữ liệu trả về ít hơn limit, không còn dữ liệu để tải
+      if (data.length < limit) {
+        setHasMore(false);
+      }
+
+      setNotifications(prev => (pageNum === 1 ? data : [...prev, ...data]));
+    } catch (error: any) {
+      if (
+        error.message.includes('Not authenticated') ||
+        error.message.includes('403')
+      ) {
+        console.warn('Bạn chưa đăng nhập — không thể lấy thông báo.');
+      } else {
+        console.error('Lỗi khi fetch thông báo:', error);
+      }
+      setHasMore(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMarkedAllAsRead = async () => {
+    try {
+      await handleMarkedAllAsReadClick();
+      setNotifications([]);
+      setPage(1);
+      setHasMore(true);
+      fetchNotifications(1);
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
+  const markAsRead = async (id: number) => {
+    try {
+      await handleMarkAsRead(id);
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, read: true } : n))
+      );
+    } catch (error) {
+      console.error(`Error marking notification ${id} as read:`, error);
+    }
+  };
 
   if (!isOpen) return null;
 
   const filteredNotifications =
     activeTab === 'unread'
-      ? notifications.filter((n: NotificationData) => !n.read)
+      ? notifications.filter(n => !n.read)
       : activeTab === 'mentions'
-      ? notifications.filter((n: NotificationData) => n.type === 'mention')
+      ? notifications.filter(n => n.type === 'mention')
       : notifications;
 
   return (
@@ -187,21 +191,20 @@ export default function NotificationModal({
           </TabsList>
 
           <div className='overflow-y-auto flex-1 max-h-[calc(80vh-180px)] custom-scrollbar'>
-            {isLoading ? (
+            {isLoading && notifications.length === 0 ? (
               <div className='flex items-center justify-center h-24'>
                 <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-primary'></div>
               </div>
             ) : filteredNotifications.length > 0 ? (
               <TabsContent value={activeTab} className='space-y-2 mt-0 pr-1'>
-                {filteredNotifications.map((notification: NotificationData) => (
+                {filteredNotifications.map(notification => (
                   <div
                     key={notification.id}
                     className={`flex items-start p-2 rounded-lg ${
                       notification.read ? '' : 'bg-muted/20'
                     } hover:bg-muted/30 transition-colors cursor-pointer`}
                     onClick={() =>
-                      !notification.read &&
-                      markAsReadMutation.mutate(notification.id)
+                      !notification.read && markAsRead(notification.id)
                     }
                   >
                     <div className='relative mr-3 flex-shrink-0'>
@@ -249,6 +252,12 @@ export default function NotificationModal({
                     )}
                   </div>
                 ))}
+                <div ref={loadMoreRef} className='h-10' />
+                {isLoading && (
+                  <div className='flex items-center justify-center h-10'>
+                    <div className='animate-spin rounded-full h-6 w-6 border-b-2 border-primary'></div>
+                  </div>
+                )}
               </TabsContent>
             ) : (
               <div className='flex items-center justify-center h-24 text-muted-foreground'>
@@ -260,10 +269,7 @@ export default function NotificationModal({
 
         {notifications.length > 0 && (
           <div className='mt-4 flex justify-end space-x-2'>
-            <Button
-              variant='outline'
-              onClick={() => markAllAsReadMutation.mutate()}
-            >
+            <Button variant='outline' onClick={handleMarkedAllAsRead}>
               Mark all as read
             </Button>
           </div>

@@ -26,6 +26,9 @@ from .image_search import ImageSearch
 
 # Import hàm tiện ích để tạo thông báo
 from .utils import create_notification
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
 class RegisterView(CreateAPIView):
@@ -885,21 +888,36 @@ class NotificationViewSet(mixins.ListModelMixin,
 
     @action(detail=False, methods=['get'], url_path='get-notifications')
     def get_notifications(self, request):
-        """Lấy tất cả thông báo của người dùng hiện tại"""
+        """Lấy thông báo của người dùng hiện tại với hỗ trợ phân trang"""
         notifications = self.get_queryset().order_by('-sent_at')
-        
-        # Thêm tùy chọn giới hạn số lượng thông báo
-        limit = request.query_params.get('limit')
-        if limit and limit.isdigit():
-            notifications = notifications[:int(limit)]
-            
-        # Thêm tùy chọn chỉ lấy thông báo chưa đọc
+        # Lấy tham số phân trang từ request
+        page = request.query_params.get('page', 1)
+        limit = request.query_params.get('limit', 10)
+        # Chuyển đổi sang số nguyên, xử lý giá trị không hợp lệ
+        try:
+            page = int(page)
+            limit = int(limit)
+        except ValueError:
+            page = 1
+            limit = 10
+        # Lọc thông báo chưa đọc nếu có tham số unread
         unread_only = request.query_params.get('unread')
         if unread_only and unread_only.lower() == 'true':
             notifications = notifications.filter(is_read=False)
-        
-        serializer = self.get_serializer(notifications, many=True)
-        return Response(serializer.data)
+        # Áp dụng phân trang
+        paginator = Paginator(notifications, limit)
+        try:
+            notifications_page = paginator.page(page)
+        except (EmptyPage, PageNotAnInteger):
+            notifications_page = paginator.page(1)  # Mặc định trả về trang 1 nếu lỗi
+        # Serialize dữ liệu
+        serializer = self.get_serializer(notifications_page, many=True)
+        # Trả về dữ liệu cùng với thông tin phân trang
+        return Response({
+            'results': serializer.data,
+            'has_more': notifications_page.has_next(),  # chỗ ni phục vụ chỗ frontend, coi thử có load thêm nữa không
+            'total_count': paginator.count,  # khúc ni trả về tổng số thông báo (thực sự là cũng không cần vì đã có has_more rồi)
+        })
     
     @action(detail=True, methods=['patch'], url_path='mark-as-read')
     def mark_as_read(self, request, pk=None):

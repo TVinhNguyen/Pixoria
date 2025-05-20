@@ -78,13 +78,17 @@ export default function ProfileModal({
               <p className='text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
                 {data.photos}
               </p>
-              <p className='text-xs text-muted-foreground'>Photos</p>
+              <p className='text-xs text-muted-foreground'>
+                {data.photos > 1 ? 'Photos' : 'Photo'}
+              </p>
             </div>
             <div className='text-center'>
               <p className='text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
                 {data.followers}
               </p>
-              <p className='text-xs text-muted-foreground'>Followers</p>
+              <p className='text-xs text-muted-foreground'>
+                {data.followers > 1 ? 'Followers' : 'Follower'}
+              </p>
             </div>
             <div className='text-center'>
               <p className='text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>

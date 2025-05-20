@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface User {
+export interface UserDetails {
   id: number;
   username: string;
   display_name: string;
@@ -22,7 +22,7 @@ interface FollowsModalProps {
   isOpen: boolean;
   onClose: () => void;
   type: 'followers' | 'following';
-  users: User[];
+  users: UserDetails[];
 }
 
 export default function FollowsModal({
@@ -32,7 +32,7 @@ export default function FollowsModal({
   users
 }: FollowsModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredUsers, setFilteredUsers] = useState<User[]>(users);
+  const [filteredUsers, setFilteredUsers] = useState<UserDetails[]>(users);
 
   useEffect(() => {
     if (searchTerm.trim() === '') {
