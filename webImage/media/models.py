@@ -126,71 +126,23 @@ class Image(models.Model):
         from django.core.cache import cache
         cache_key = f'image:{self.id}'
         cache.set(cache_key, self, 60*60*24)  # Cache trong 24 giờ
-    
-    def _add_to_indices(self):
-        """Thêm ảnh vào các index tìm kiếm"""
+      def _add_to_indices(self):
+        """Thêm ảnh vào CLIP index tìm kiếm"""
         # Thêm vào CLIP index
         try:
             get_clip_search().update_index_for_image(self.id)
             print(f"✅ Added image #{self.id} to CLIP index due to visibility change")
         except Exception as e:
             print(f"❌ Error adding image #{self.id} to CLIP index: {e}")
-            
-        # Thêm vào ResNet50 index
-        try:
-            updater = get_updater()
-            updated = updater.update_index([self], batch_size=1)
-            if updated > 0:
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Added image #{self.id} to ResNet50 index due to visibility change")
-        except Exception as e:
-            print(f"❌ Error adding image #{self.id} to ResNet50 index: {e}")
-      def _remove_from_indices(self):
-        """Xóa ảnh khỏi các index tìm kiếm"""
-        # Xóa khỏi CLIP index
-        try:
-            get_clip_search().remove_from_index(self.id)
-            print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
-        except Exception as e:
-            print(f"❌ Error removing image #{self.id} from CLIP index: {e}")
-            
-        # Xóa khỏi ResNet50 index
-        try:
-            updater = get_updater()
-            removed = updater.remove_from_index([self.id])
-            if removed > 0:
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Removed image #{self.id} from ResNet50 index due to visibility change")
-        except Exception as e:
-            print(f"❌ Error removing image #{self.id} from ResNet50 index: {e}")
-    
-    def like_image(self, user_profile):
-            updater = get_updater()
-            updated = updater.update_index([self], batch_size=1)
-            if updated > 0:
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Added image #{self.id} to ResNet50 index due to visibility change")
-        except Exception as e:
-            print(f"❌ Error adding image #{self.id} to ResNet50 index: {e}")
     
     def _remove_from_indices(self):
-        """Xóa ảnh khỏi các index tìm kiếm"""
+        """Xóa ảnh khỏi CLIP index tìm kiếm"""
         # Xóa khỏi CLIP index
         try:
             get_clip_search().remove_from_index(self.id)
             print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
         except Exception as e:
             print(f"❌ Error removing image #{self.id} from CLIP index: {e}")
-            
-        # Xóa khỏi ResNet50 index
-        try:
-            updater = get_updater()
-            removed = updater.remove_from_index([self.id])
-            if removed > 0:
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Removed image #{self.id} from ResNet50 index due to visibility change")
-        except Exception as e:
-            print(f"❌ Error removing image #{self.id} from ResNet50 index: {e}")
     
     def like_image(self, user_profile):
         """ Hàm xử lý khi user like ảnh sử dụng Redis để cải thiện hiệu suất với fallback """
@@ -283,7 +235,7 @@ class Image(models.Model):
 
 @receiver(post_save, sender=Image)
 def update_clip_index(sender, instance, created, **kwargs):
-    """Update both CLIP and ResNet50 indices when a new image is added"""
+    """Update CLIP index when a new image is added"""
     if created and instance.is_public:  # Only process if the image is newly created and public
         # Update CLIP index
         try:
@@ -291,25 +243,11 @@ def update_clip_index(sender, instance, created, **kwargs):
             print(f"✅ Successfully added image #{instance.id} to the CLIP index")
         except Exception as e:
             print(f"❌ Error updating CLIP index for image #{instance.id}: {e}")
-        
-        # Update ResNet50 index
-        try:
-            updater = get_updater()
-            # Create a list with just this image
-            updated = updater.update_index([instance], batch_size=1)
-            if updated > 0:
-                # Save the updated index if successful
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Successfully added image #{instance.id} to the ResNet50 index")
-            else:
-                print(f"⚠️ Failed to add image #{instance.id} to the ResNet50 index")
-        except Exception as e:
-            print(f"❌ Error updating ResNet50 index for image #{instance.id}: {e}")
 
 
 @receiver(post_delete, sender=Image)
 def remove_image_from_index(sender, instance, **kwargs):
-    """Remove image from both CLIP and ResNet50 indices when it is deleted"""
+    """Remove image from CLIP index when it is deleted"""
     if instance.is_public:  # Only process if the image is public
         # Remove from CLIP index
         try:
@@ -317,19 +255,6 @@ def remove_image_from_index(sender, instance, **kwargs):
             print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
         except Exception as e:
             print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
-        
-        # Remove from ResNet50 index
-        try:
-            updater = get_updater()
-            removed = updater.remove_from_index([instance.id])
-            if removed > 0:
-                # Save the updated index if successful
-                updater.save(INDEX_PATH, MAPPING_PATH)
-                print(f"✅ Successfully removed image #{instance.id} from the ResNet50 index")
-            else:
-                print(f"⚠️ Image #{instance.id} not found in the ResNet50 index")
-        except Exception as e:
-            print(f"❌ Error removing image #{instance.id} from the ResNet50 index: {e}")
 
 class ImageCategory(models.Model):
     image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="categories")
