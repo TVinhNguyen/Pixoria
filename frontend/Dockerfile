@@ -15,14 +15,19 @@ RUN apk add --no-cache libc6-compat
 # Copy everything to build properly, path resolution issues require complete codebase
 COPY . .
 
-# Install all dependencies (including dev dependencies)
-RUN npm install
+# Install dependencies with specific approach to fix autoprefixer issue
+RUN npm install -g npm@latest
+RUN npm cache clean --force
+RUN npm install --legacy-peer-deps
+RUN npm i -g autoprefixer postcss tailwindcss
+RUN npm i autoprefixer postcss tailwindcss --save-dev
+RUN npm ls autoprefixer || true
 
-# Explicitly install autoprefixer and postcss
-RUN npm install autoprefixer postcss tailwindcss --save-dev
+# Create empty postcss.config.js file to ensure it's available
+RUN echo "module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };" > postcss.config.js
 
-# Build the Next.js application
-RUN npm run build
+# Build the Next.js application with NODE_OPTIONS for more memory
+RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -44,6 +49,7 @@ RUN mkdir -p /app/.next/cache && \
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/postcss.config.js ./postcss.config.js
 
 # Switch to non-root user
 USER nextjs
