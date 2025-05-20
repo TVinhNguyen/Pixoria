@@ -30,6 +30,7 @@ import { handleGetCollectionById } from '@/lib/api-action/api-collection';
 import { Collection } from '@/components/modal/collections/edit-collection-modal';
 import { getAllFollowers, getAllFollowings } from '@/lib/api-action/api-follow';
 import { handleGetCollections } from '@/lib/api-action/api-collection';
+import { handleLike } from '@/lib/api-action/image-actions';
 import ProfileEditModal from '@/components/modal/edit-profile-modal';
 import EditCollectionModal from '@/components/modal/collections/edit-collection-modal';
 import CollectionImagesModal from '@/components/modal/collections/collection-images-modal';
@@ -71,9 +72,11 @@ function ProfileContent() {
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
 
+  const [isUnlikeImage, setUnlikeImage] = useState(false);
+
   const queryClient = useQueryClient();
 
-  //profile data
+  // Profile data
   const {
     data: profileData,
     isLoading: profileLoading
@@ -95,6 +98,10 @@ function ProfileContent() {
     enabled: tab === 'photos',
     staleTime: 5 * 60 * 1000
   });
+
+  useEffect(() => {
+    console.log('>>> userImages:', userImages);
+  }, [userImages]);
 
   // Query cho collections
   const {
@@ -131,20 +138,31 @@ function ProfileContent() {
     staleTime: 5 * 60 * 1000
   });
 
-  // Query cho collection data
-  const { data: collectionDataQuery }: UseQueryResult<Collection, Error> =
-    useQuery({
-      queryKey: ['collection', selectedCollectionId],
-      queryFn: () =>
-        handleGetCollectionById('', (selectedCollectionId || 0).toString()),
-      enabled: !!selectedCollectionId && isEditCollectionModalOpen
-    });
-
+  // Fetch collection data manually
   useEffect(() => {
-    if (collectionDataQuery) {
-      setCollectionData(collectionDataQuery);
-    }
-  }, [collectionDataQuery]);
+    const fetchCollectionData = async () => {
+      if (isEditCollectionModalOpen && selectedCollectionId) {
+        try {
+          const data = await handleGetCollectionById(
+            '',
+            selectedCollectionId.toString()
+          );
+          setCollectionData(data);
+        } catch (error: any) {
+          console.error('Error fetching collection data:', error);
+          setToastVariant('error');
+          setToastMessage({
+            title: 'Error',
+            description: 'Failed to load collection data.',
+            duration: 3000
+          });
+          setToastOpen(true);
+        }
+      }
+    };
+
+    fetchCollectionData();
+  }, [isEditCollectionModalOpen, selectedCollectionId]);
 
   // Query cho followers
   const {
@@ -237,7 +255,6 @@ function ProfileContent() {
       setSelectedCollectionId(null);
       setCollectionData(null);
       queryClient.invalidateQueries({ queryKey: ['collections'] });
-      queryClient.invalidateQueries({ queryKey: ['collection'] });
     }
   }, [isEditCollectionModalOpen, queryClient]);
 
@@ -320,7 +337,9 @@ function ProfileContent() {
               <p className='text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
                 {profileData?.photos || 0}
               </p>
-              <p className='text-sm text-muted-foreground'>Photos</p>
+              <p className='text-sm text-muted-foreground'>
+                {profileData?.photos > 1 ? 'Photos' : 'Photo'}
+              </p>
             </div>
             <div
               className='text-center cursor-pointer'
@@ -329,7 +348,9 @@ function ProfileContent() {
               <p className='text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-transparent bg-clip-text'>
                 {(profileData?.followers || 0).toLocaleString()}
               </p>
-              <p className='text-sm text-muted-foreground'>Followers</p>
+              <p className='text-sm text-muted-foreground'>
+                {profileData?.followers > 1 ? 'Followers' : 'Follower'}
+              </p>
             </div>
             <div
               className='text-center cursor-pointer'
@@ -354,7 +375,7 @@ function ProfileContent() {
               Collections
             </TabsTrigger>
             <TabsTrigger value='likes'>
-              <Bookmark className='mr-2 h-4 w-4' />
+              <Heart className='mr-2 h-4 w-4' />
               Likes
             </TabsTrigger>
             <TabsTrigger value='downloads'>
@@ -391,16 +412,6 @@ function ProfileContent() {
                       <span className='text-sm font-medium text-white'>
                         {image.title || `Photo ${i + 1}`}
                       </span>
-                      <Button
-                        variant='ghost'
-                        size='icon'
-                        className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
-                      >
-                        <Heart className='h-4 w-4' />
-                        {image.likes > 0 && (
-                          <span className='sr-only'>{image.likes} likes</span>
-                        )}
-                      </Button>
                     </div>
                   </div>
                 ))}
@@ -455,7 +466,9 @@ function ProfileContent() {
                         {collection.name}
                       </h3>
                       <p className='text-sm text-gray-300'>
-                        {collection.images.length} photos
+                        {collection.images.length > 1
+                          ? `${collection.images.length} photos`
+                          : `${collection.images.length} photo`}
                       </p>
                     </div>
                     <Button
@@ -502,15 +515,18 @@ function ProfileContent() {
                     />
                     <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100'></div>
                     <div className='absolute bottom-0 left-0 right-0 flex items-center justify-between p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100'>
-                      <span className='text-sm font-medium text-white'>
+                      <span className='text-sm font-medium text-white truncate max-w-[80%]'>
                         {image.title || `Saved ${i + 1}`}
                       </span>
                       <Button
                         variant='ghost'
                         size='icon'
                         className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
+                        onClick={() => {
+                          alert('Unliked');
+                        }}
                       >
-                        <Bookmark className='h-4 w-4 fill-current' />
+                        <Heart className='h-4 w-4 fill-current' />
                       </Button>
                     </div>
                   </div>
@@ -612,7 +628,7 @@ function ProfileContent() {
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
           username=''
-          collectionId={selectedCollectionId}
+          collectionId={selectedCollectionId.toString()}
         />
       )}
 

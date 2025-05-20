@@ -16,7 +16,7 @@ export interface Collection {
   name: string;
   cover_image?: string;
   description?: string;
-  is_public?: boolean;
+  is_public: boolean;
 }
 
 interface CollectionModalProps {
@@ -66,7 +66,7 @@ export default function EditCollectionModal({
       setUpdatedCollection({
         name: collectionFetchedData.name,
         description: collectionFetchedData.description || '',
-        is_public: collectionFetchedData.is_public || true
+        is_public: collectionFetchedData.is_public
       });
     }
   }, [isOpen]);
