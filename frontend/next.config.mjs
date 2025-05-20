@@ -24,8 +24,7 @@ const nextConfig = {
   webpack: (config) => {
     // Important: Return the modified config
     return config;
-  },
-  experimental: {
+  },  experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,

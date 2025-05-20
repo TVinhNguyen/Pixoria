@@ -42,6 +42,7 @@ def get_updater():
         if os.path.exists(INDEX_PATH) and os.path.exists(MAPPING_PATH):
             try:
                 _updater_instance.load(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Loaded existing ResNet50 index with {_updater_instance.index.ntotal} images")
             except Exception as e:
                 print(f"⚠️ Không thể load index: {e}. Tạo index mới.")
     return _updater_instance
@@ -96,13 +97,100 @@ class Image(models.Model):
         ordering = ['-created_at']
 
     def save(self, *args, **kwargs):
-        """ Tự động cập nhật số lượng ảnh khi lưu """
+        """ Tự động cập nhật số lượng ảnh khi lưu và xử lý thay đổi is_public """
+        # Kiểm tra nếu đây là cập nhật (không phải tạo mới) 
+        # và trạng thái is_public đã thay đổi
+        is_update = self.pk is not None
+        
+        if is_update:
+            try:
+                old_instance = Image.objects.get(pk=self.pk)
+                was_public = old_instance.is_public
+                
+                # Xử lý thay đổi trạng thái is_public
+                if was_public != self.is_public:
+                    if self.is_public:
+                        # Ảnh từ private -> public: thêm vào index
+                        self._add_to_indices()
+                    else:
+                        # Ảnh từ public -> private: xóa khỏi index
+                        self._remove_from_indices()
+            except Exception as e:
+                print(f"Lỗi khi kiểm tra thay đổi is_public: {e}")
+        
+        # Lưu bình thường
         super().save(*args, **kwargs)
         self.user.update_counts()
+        
         # Cache ảnh khi lưu
         from django.core.cache import cache
         cache_key = f'image:{self.id}'
         cache.set(cache_key, self, 60*60*24)  # Cache trong 24 giờ
+    
+    def _add_to_indices(self):
+        """Thêm ảnh vào các index tìm kiếm"""
+        # Thêm vào CLIP index
+        try:
+            get_clip_search().update_index_for_image(self.id)
+            print(f"✅ Added image #{self.id} to CLIP index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error adding image #{self.id} to CLIP index: {e}")
+            
+        # Thêm vào ResNet50 index
+        try:
+            updater = get_updater()
+            updated = updater.update_index([self], batch_size=1)
+            if updated > 0:
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Added image #{self.id} to ResNet50 index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error adding image #{self.id} to ResNet50 index: {e}")
+      def _remove_from_indices(self):
+        """Xóa ảnh khỏi các index tìm kiếm"""
+        # Xóa khỏi CLIP index
+        try:
+            get_clip_search().remove_from_index(self.id)
+            print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error removing image #{self.id} from CLIP index: {e}")
+            
+        # Xóa khỏi ResNet50 index
+        try:
+            updater = get_updater()
+            removed = updater.remove_from_index([self.id])
+            if removed > 0:
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Removed image #{self.id} from ResNet50 index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error removing image #{self.id} from ResNet50 index: {e}")
+    
+    def like_image(self, user_profile):
+            updater = get_updater()
+            updated = updater.update_index([self], batch_size=1)
+            if updated > 0:
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Added image #{self.id} to ResNet50 index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error adding image #{self.id} to ResNet50 index: {e}")
+    
+    def _remove_from_indices(self):
+        """Xóa ảnh khỏi các index tìm kiếm"""
+        # Xóa khỏi CLIP index
+        try:
+            get_clip_search().remove_from_index(self.id)
+            print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error removing image #{self.id} from CLIP index: {e}")
+            
+        # Xóa khỏi ResNet50 index
+        try:
+            updater = get_updater()
+            removed = updater.remove_from_index([self.id])
+            if removed > 0:
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Removed image #{self.id} from ResNet50 index due to visibility change")
+        except Exception as e:
+            print(f"❌ Error removing image #{self.id} from ResNet50 index: {e}")
     
     def like_image(self, user_profile):
         """ Hàm xử lý khi user like ảnh sử dụng Redis để cải thiện hiệu suất với fallback """
@@ -195,24 +283,53 @@ class Image(models.Model):
 
 @receiver(post_save, sender=Image)
 def update_clip_index(sender, instance, created, **kwargs):
-    """Update CLIP index when a new image is added"""
+    """Update both CLIP and ResNet50 indices when a new image is added"""
     if created and instance.is_public:  # Only process if the image is newly created and public
+        # Update CLIP index
         try:
             get_clip_search().update_index_for_image(instance.id)
-            print(f"✅ Successfully added image  #{instance.id} to the CLIP index")
+            print(f"✅ Successfully added image #{instance.id} to the CLIP index")
         except Exception as e:
             print(f"❌ Error updating CLIP index for image #{instance.id}: {e}")
+        
+        # Update ResNet50 index
+        try:
+            updater = get_updater()
+            # Create a list with just this image
+            updated = updater.update_index([instance], batch_size=1)
+            if updated > 0:
+                # Save the updated index if successful
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Successfully added image #{instance.id} to the ResNet50 index")
+            else:
+                print(f"⚠️ Failed to add image #{instance.id} to the ResNet50 index")
+        except Exception as e:
+            print(f"❌ Error updating ResNet50 index for image #{instance.id}: {e}")
 
 
 @receiver(post_delete, sender=Image)
 def remove_image_from_index(sender, instance, **kwargs):
-    """Remove an image from the CLIP index when it is deleted"""
+    """Remove image from both CLIP and ResNet50 indices when it is deleted"""
     if instance.is_public:  # Only process if the image is public
+        # Remove from CLIP index
         try:
             get_clip_search().remove_from_index(instance.id)
             print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
         except Exception as e:
             print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
+        
+        # Remove from ResNet50 index
+        try:
+            updater = get_updater()
+            removed = updater.remove_from_index([instance.id])
+            if removed > 0:
+                # Save the updated index if successful
+                updater.save(INDEX_PATH, MAPPING_PATH)
+                print(f"✅ Successfully removed image #{instance.id} from the ResNet50 index")
+            else:
+                print(f"⚠️ Image #{instance.id} not found in the ResNet50 index")
+        except Exception as e:
+            print(f"❌ Error removing image #{instance.id} from the ResNet50 index: {e}")
 
 class ImageCategory(models.Model):
     image = models.ForeignKey(Image, on_delete=models.CASCADE, related_name="categories")
