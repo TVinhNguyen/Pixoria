@@ -18,8 +18,8 @@ COPY . .
 # Install all dependencies (including dev dependencies)
 RUN npm install
 
-# Verify autoprefixer is installed
-RUN npm list autoprefixer
+# Explicitly install autoprefixer and postcss
+RUN npm install autoprefixer postcss tailwindcss --save-dev
 
 # Build the Next.js application
 RUN npm run build
@@ -49,6 +49,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 
 EXPOSE 3000
-ENV PORT 3000
+ENV PORT=3000
 
 CMD ["node", "server.js"]
