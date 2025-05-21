@@ -14,8 +14,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 export interface UserDetails {
   id: number;
   username: string;
-  display_name: string;
-  avatar: string;
+  display_name?: string; // Made optional
+  avatar?: string; // Made optional
 }
 
 interface FollowsModalProps {
@@ -39,9 +39,8 @@ export default function FollowsModal({
       setFilteredUsers(users);
     } else {
       const filtered = users.filter(
-        user =>
-          user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.display_name.toLowerCase().includes(searchTerm.toLowerCase())
+        user =>          user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
       );
       setFilteredUsers(filtered);
     }
@@ -99,17 +98,15 @@ export default function FollowsModal({
                           user.avatar || '/placeholder.svg?height=40&width=40'
                         }
                         alt={user.username}
-                      />
-                      <AvatarFallback>
-                        {user.display_name.substring(0, 2).toUpperCase()}
+                      />                      <AvatarFallback>
+                        {user.display_name ? user.display_name.substring(0, 2).toUpperCase() : user.username.substring(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <div className='flex items-center gap-1'>
                         <p className='font-semibold'>{user.username}</p>
-                      </div>
-                      <p className='text-sm text-muted-foreground'>
-                        {user.display_name}
+                      </div>                      <p className='text-sm text-muted-foreground'>
+                        {user.display_name || user.username}
                       </p>
                     </div>
                   </div>

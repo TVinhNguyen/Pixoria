@@ -28,6 +28,8 @@ import {
 } from '@/lib/api-action/api-profile';
 import { handleGetCollectionById } from '@/lib/api-action/api-collection';
 import { Collection } from '@/components/modal/collections/edit-collection-modal';
+
+// Import getAllFollowers and getAllFollowings
 import { getAllFollowers, getAllFollowings } from '@/lib/api-action/api-follow';
 import { handleGetCollections } from '@/lib/api-action/api-collection';
 import { handleLike } from '@/lib/api-action/image-actions';
@@ -36,8 +38,9 @@ import EditCollectionModal from '@/components/modal/collections/edit-collection-
 import CollectionImagesModal from '@/components/modal/collections/collection-images-modal';
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
+import { useLocalStorage } from '@/hooks/use-localStorage';
 
-// Bữa sau nên tách ra thành 1 file riêng để có thể dùng lại, hơi rúi
+// Define interfaces for this component
 interface UserDetails {
   id: number;
   username: string;
@@ -56,10 +59,14 @@ function ProfileContent() {
     duration: 0
   });
 
-  const router = useRouter();
-  const tabParams = useSearchParams();
+  const router = useRouter();  const tabParams = useSearchParams();
   const defaultTab = tabParams.get('tab') || 'photos';
   const [tab, setTab] = useState(defaultTab);
+
+  // Only run certain operations on client-side to avoid SSR issues
+  useEffect(() => {
+    // Client-side initialization
+  }, []);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCollectionId, setSelectedCollectionId] = useState<
@@ -72,19 +79,20 @@ function ProfileContent() {
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
 
-  // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)
-  const [isUnlikeImage, setUnlikeImage] = useState(false);
+  // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)  const [isUnlikeImage, setUnlikeImage] = useState(false);
 
   const queryClient = useQueryClient();
-
+    // Sử dụng custom hook cho localStorage để tránh lỗi server-side rendering
+  const [username, , isClient] = useLocalStorage('username', 'guest');
+  const [userId] = useLocalStorage('user_id', '');
   // Profile data
   const {
     data: profileData,
     isLoading: profileLoading
   }: UseQueryResult<any, Error> = useQuery({
-    queryKey: ['profile', localStorage.getItem('username') || 'guest'],
-    queryFn: () =>
-      handleProfileClick(localStorage.getItem('username') || 'guest'),
+    queryKey: ['profile', username],
+    queryFn: () => handleProfileClick(username),
+    enabled: isClient, // Chỉ chạy khi đã ở client side
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000
   });
@@ -104,7 +112,7 @@ function ProfileContent() {
   const {
     data: collectionsData,
     isLoading: collectionsLoading
-  }: UseQueryResult<{ results: Collection[] }, Error> = useQuery({
+  }: UseQueryResult<{ results: (Collection & { images: number[] })[] }, Error> = useQuery({
     queryKey: ['collections'],
     queryFn: handleGetCollections,
     enabled: tab === 'collections',
@@ -138,15 +146,14 @@ function ProfileContent() {
   // Fetch collection data manually
   useEffect(() => {
     const fetchCollectionData = async () => {
-      if (isEditCollectionModalOpen && selectedCollectionId) {
-        try {
+      if (isEditCollectionModalOpen && selectedCollectionId) {        try {
           const data = await handleGetCollectionById(
             '',
             selectedCollectionId.toString()
           );
           setCollectionData(data);
         } catch (error: any) {
-          console.error('Error fetching collection data:', error);
+          // Handle collection fetch error
           setToastVariant('error');
           setToastMessage({
             title: 'Error',
@@ -160,22 +167,21 @@ function ProfileContent() {
 
     fetchCollectionData();
   }, [isEditCollectionModalOpen, selectedCollectionId]);
-
   // Query cho followers
   const {
     data: followersData = { followers: [] }
   }: UseQueryResult<{ followers: UserDetails[] }, Error> = useQuery({
-    queryKey: ['followers', localStorage.getItem('user_id')],
+    queryKey: ['followers', userId],
     queryFn: async () => {
       const result = await getAllFollowers(
-        Number(localStorage.getItem('user_id'))
+        Number(userId)
       );
       if (Array.isArray(result)) {
         return { followers: result };
       }
       return result;
     },
-    enabled: isFollowersOpen,
+    enabled: isFollowersOpen && isClient,
     staleTime: 5 * 60 * 1000
   });
 
@@ -185,17 +191,17 @@ function ProfileContent() {
   const {
     data: followingData = { followings: [] }
   }: UseQueryResult<{ followings: UserDetails[] }, Error> = useQuery({
-    queryKey: ['following', localStorage.getItem('user_id')],
+    queryKey: ['following', userId],
     queryFn: async () => {
       const result = await getAllFollowings(
-        Number(localStorage.getItem('user_id'))
+        Number(userId)
       );
       if (Array.isArray(result)) {
         return { followings: result };
       }
       return result;
     },
-    enabled: isFollowingOpen,
+    enabled: isFollowingOpen && isClient,
     staleTime: 5 * 60 * 1000
   });
 
@@ -248,11 +254,10 @@ function ProfileContent() {
         'Success',
         'Image unliked successfully.',
         3000
-      );
-    } catch (error: any) {
+      );    } catch (error: any) {
       queryClient.invalidateQueries({ queryKey: ['likedImages'] });
       setNotification('error', 'Error', 'Failed to unlike the image.', 3000);
-      console.error('Error unliking image:', error);
+      // Log error silently or use a monitoring tool
     }
   };
 
@@ -500,11 +505,11 @@ function ProfileContent() {
                     <div className='absolute bottom-0 left-0 right-0 p-4'>
                       <h3 className='text-lg font-bold text-white'>
                         {collection.name}
-                      </h3>
-                      <p className='text-sm text-gray-300'>
-                        {collection.images.length > 1
-                          ? `${collection.images.length} photos`
-                          : `${collection.images.length} photo`}
+                      </h3>                      <p className='text-sm text-gray-300'>                        {collection.images && Array.isArray(collection.images) && collection.images.length > 0
+                          ? collection.images.length > 1
+                            ? `${collection.images.length} photos`
+                            : `${collection.images.length} photo`
+                          : '0 photos'}
                       </p>
                     </div>
                     <Button
@@ -645,24 +650,20 @@ function ProfileContent() {
             social_link: profileData.social_link || ''
           }}
         />
-      )}
-
-      {isEditCollectionModalOpen &&
+      )}      {isEditCollectionModalOpen &&
         selectedCollectionId != null &&
         collectionData && (
           <EditCollectionModal
             isOpen={isEditCollectionModalOpen}
             onClose={() => setIsEditCollectionModalOpen(false)}
-            collectionFetchedData={collectionData}
+            collectionFetchedData={collectionData as Collection}
           />
-        )}
-
-      {isCollectionImagesOpen && selectedCollectionId && (
+        )}{isCollectionImagesOpen && selectedCollectionId && (
         <CollectionImagesModal
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
           username=''
-          collectionId={selectedCollectionId.toString()}
+          collectionId={String(selectedCollectionId)}
         />
       )}
 
