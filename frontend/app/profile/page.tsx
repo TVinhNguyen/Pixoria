@@ -262,7 +262,38 @@ function ProfileContent() {
   };
 
   const handleDeleteImage = async (imageId: number) => {
-    alert('id delete is: ' + imageId);
+    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa ảnh này không?');
+    if (!confirmed) return;
+    try {
+      const res = await import('@/lib/api-action/image-actions');
+      const result = await res.handleDeleteImage(imageId);
+      if (result.status === 'success') {
+        setToastVariant('success');
+        setToastMessage({
+          title: 'Đã xóa ảnh',
+          description: 'Ảnh đã được xóa thành công.',
+          duration: 3000
+        });
+        setToastOpen(true);
+        await queryClient.invalidateQueries();
+      } else {
+        setToastVariant('error');
+        setToastMessage({
+          title: 'Lỗi',
+          description: result.detail || 'Xóa ảnh thất bại.',
+          duration: 3000
+        });
+        setToastOpen(true);
+      }
+    } catch (error) {
+      setToastVariant('error');
+      setToastMessage({
+        title: 'Lỗi',
+        description: 'Có lỗi xảy ra khi xóa ảnh.',
+        duration: 3000
+      });
+      setToastOpen(true);
+    }
   };
 
   const handleClickFollowing = () => {

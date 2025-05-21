@@ -23,3 +23,17 @@ export async function handleDownload(image_id: number) {
     const data = await response.json()
     return data
 }
+
+export async function handleDeleteImage(image_id: number) {
+    const response = await fetch(`${API_BASE_URL}/images/${image_id}/`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+    });
+    if (response.status === 204) {
+        return { status: 'success' };
+    }
+    const data = await response.json().catch(() => ({}));
+    return { status: 'error', ...data };
+}
