@@ -150,6 +150,7 @@ class Image(models.Model):
                     break
             
             if image_exists:
+                # Sử dụng phương thức remove_from_index đã sửa đổi (bỏ rebuild)
                 clip_search.remove_from_index(self.id)
                 print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
             else:

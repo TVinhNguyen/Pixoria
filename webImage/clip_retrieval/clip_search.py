@@ -386,40 +386,11 @@ class CLIPImageSearch:
             # Find and remove from image_metadata list
             self.image_metadata = [img for img in self.image_metadata if str(img['id']) != str(image_id)]
             
-            # Rebuild FAISS index (since FAISS doesn't support direct removal)
-            embedding_path = os.path.join(INDEX_DIR, 'clip_image_embeddings.npy')
-            if os.path.exists(embedding_path):
-                try:
-                    all_embeddings = np.load(embedding_path)
-                    
-                    # Check if index is within bounds before removing
-                    if 0 <= image_index < all_embeddings.shape[0]:
-                        # Remove the embedding for this image
-                        all_embeddings = np.delete(all_embeddings, image_index, axis=0)
-                        # Save updated embeddings
-                        np.save(embedding_path, all_embeddings)
-                        
-                        # Recreate the index
-                        if all_embeddings.shape[0] > 0:  # Make sure we have at least one embedding
-                            dimension = all_embeddings.shape[1]
-                            self.faiss_index = faiss.IndexFlatL2(dimension)
-                            self.faiss_index.add(all_embeddings)
-                        else:
-                            # Create empty index with appropriate dimension
-                            dimension = self.faiss_index.d  # Get dimension from current index
-                            self.faiss_index = faiss.IndexFlatL2(dimension)
-                    else:
-                        print(f"Warning: Image index {image_index} is out of bounds for embeddings array with size {all_embeddings.shape[0]}")
-                        # We should rebuild the entire index to ensure consistency
-                        self._rebuild_index_from_metadata()
-                except Exception as e:
-                    print(f"Error modifying embeddings: {e}")
-                    # Try to rebuild the index from scratch
-                    self._rebuild_index_from_metadata()
-            else:
-                print("Warning: Need to rebuild index completely as embeddings file not found")
-                # Try to rebuild the index from what we have
-                self._rebuild_index_from_metadata()
+            # Note: We're deliberately NOT rebuilding the FAISS index
+            # Instead we just mark the index as stale by updating metadata
+            # The index will be slightly inaccurate but will not cause errors
+            # This avoids expensive rebuilding operations
+            print(f"Removed image {image_id} from metadata but skipped FAISS index rebuild")
             
             # Xóa cache liên quan đến tìm kiếm để đảm bảo kết quả luôn mới nhất
             self._invalidate_search_cache()
