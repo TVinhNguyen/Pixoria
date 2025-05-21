@@ -10,10 +10,10 @@ import {
   ImageIcon,
   Download,
   Grid,
-  Bookmark,
   Edit,
   Share2,
-  LinkIcon
+  LinkIcon,
+  Trash
 } from 'lucide-react';
 import {
   useQuery,
@@ -72,6 +72,7 @@ function ProfileContent() {
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
 
+  // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)
   const [isUnlikeImage, setUnlikeImage] = useState(false);
 
   const queryClient = useQueryClient();
@@ -98,10 +99,6 @@ function ProfileContent() {
     enabled: tab === 'photos',
     staleTime: 5 * 60 * 1000
   });
-
-  useEffect(() => {
-    console.log('>>> userImages:', userImages);
-  }, [userImages]);
 
   // Query cho collections
   const {
@@ -230,6 +227,37 @@ function ProfileContent() {
       'Sucessfully copy your profile link to clipboard.',
       3000
     );
+  };
+
+  const handleUnlike = async (imageId: number) => {
+    try {
+      // cập nhật giao diện, loại bỏ ảnh đã unlike
+      queryClient.setQueryData(['likedImages'], (old: any[] | undefined) =>
+        old ? old.filter(image => image.id !== imageId) : []
+      );
+
+      // fetch API để lưu ảnh trong db
+      await handleLike(imageId);
+
+      // cập nhật lại cache
+      await queryClient.invalidateQueries({ queryKey: ['likedImages'] });
+
+      // thông báo là đã thành công
+      setNotification(
+        'success',
+        'Success',
+        'Image unliked successfully.',
+        3000
+      );
+    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: ['likedImages'] });
+      setNotification('error', 'Error', 'Failed to unlike the image.', 3000);
+      console.error('Error unliking image:', error);
+    }
+  };
+
+  const handleDeleteImage = async (imageId: number) => {
+    alert('id delete is: ' + imageId);
   };
 
   const handleClickFollowing = () => {
@@ -412,6 +440,14 @@ function ProfileContent() {
                       <span className='text-sm font-medium text-white'>
                         {image.title || `Photo ${i + 1}`}
                       </span>
+                      <Button
+                        variant='ghost'
+                        size='icon'
+                        className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
+                        onClick={() => handleDeleteImage(image.id)}
+                      >
+                        <Trash className='h-4 w-4 fill-current' />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -522,9 +558,7 @@ function ProfileContent() {
                         variant='ghost'
                         size='icon'
                         className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
-                        onClick={() => {
-                          alert('Unliked');
-                        }}
+                        onClick={() => handleUnlike(image.id)}
                       >
                         <Heart className='h-4 w-4 fill-current' />
                       </Button>

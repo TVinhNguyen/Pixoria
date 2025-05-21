@@ -139,8 +139,21 @@ class Image(models.Model):
         """Xóa ảnh khỏi CLIP index tìm kiếm"""
         # Xóa khỏi CLIP index
         try:
-            get_clip_search().remove_from_index(self.id)
-            print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
+            # Kiểm tra xem ảnh có tồn tại trong CLIP index hay không
+            clip_search = get_clip_search()
+            
+            # Kiểm tra sự tồn tại của ảnh trong metadata của index
+            image_exists = False
+            for img_id in clip_search.image_ids:
+                if str(img_id) == str(self.id):
+                    image_exists = True
+                    break
+            
+            if image_exists:
+                clip_search.remove_from_index(self.id)
+                print(f"✅ Removed image #{self.id} from CLIP index due to visibility change")
+            else:
+                print(f"⚠️ Image #{self.id} not found in CLIP index, skipping removal")
         except Exception as e:
             print(f"❌ Error removing image #{self.id} from CLIP index: {e}")
     
@@ -251,8 +264,21 @@ def remove_image_from_index(sender, instance, **kwargs):
     if instance.is_public:  # Only process if the image is public
         # Remove from CLIP index
         try:
-            get_clip_search().remove_from_index(instance.id)
-            print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
+            # Kiểm tra xem ảnh có tồn tại trong CLIP index hay không
+            clip_search = get_clip_search()
+            
+            # Kiểm tra sự tồn tại của ảnh trong metadata của index
+            image_exists = False
+            for img_id in clip_search.image_ids:
+                if str(img_id) == str(instance.id):
+                    image_exists = True
+                    break
+            
+            if image_exists:
+                clip_search.remove_from_index(instance.id)
+                print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
+            else:
+                print(f"⚠️ Image #{instance.id} not found in CLIP index, skipping removal")
         except Exception as e:
             print(f"❌ Error removing image #{instance.id} from the CLIP index: {e}")
 
