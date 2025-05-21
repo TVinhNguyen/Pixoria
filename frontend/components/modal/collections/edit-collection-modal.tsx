@@ -17,6 +17,7 @@ export interface Collection {
   cover_image?: string;
   description?: string;
   is_public: boolean;
+  images?: number[]; // Thêm thuộc tính images là optional
 }
 
 interface CollectionModalProps {
@@ -60,7 +61,6 @@ export default function EditCollectionModal({
       onClose();
     }, duration - 3000);
   };
-
   useEffect(() => {
     if (isOpen) {
       setUpdatedCollection({
@@ -69,7 +69,7 @@ export default function EditCollectionModal({
         is_public: collectionFetchedData.is_public
       });
     }
-  }, [isOpen]);
+  }, [isOpen, collectionFetchedData.name, collectionFetchedData.description, collectionFetchedData.is_public]);
 
   const handleSaveChanges = async () => {
     try {
@@ -95,8 +95,7 @@ export default function EditCollectionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className='sm:max-w-md overflow-y-auto max-h-[90vh]'>
-        <DialogHeader>
+      <DialogContent className='sm:max-w-md overflow-y-auto max-h-[90vh]'>        <DialogHeader>
           <DialogTitle className='text-center text-2xl font-bold'>
             {' '}
             Edit Collection{' '}
@@ -107,7 +106,7 @@ export default function EditCollectionModal({
             <div className='space-y-2'>
               <Label htmlFor='collection-name' className='text-base'>
                 {' '}
-                Collection's name{' '}
+                Collection&apos;s name{' '}
               </Label>
               <Input
                 id='collection-name'
