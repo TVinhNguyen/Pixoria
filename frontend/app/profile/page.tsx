@@ -40,6 +40,7 @@ import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 import { useLocalStorage } from '@/hooks/use-localStorage';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import Header from '@/components/header';
 
 // Define interfaces for this component
 interface UserDetails {
@@ -755,14 +756,17 @@ function ProfileContent() {
 
 export default function Profile() {
   return (
-    <Suspense
-      fallback={
-        <div className='min-h-screen pt-16 flex items-center justify-center'>
-          <div className='animate-pulse text-primary'>Loading profile...</div>
-        </div>
-      }
-    >
-      <ProfileContent />
-    </Suspense>
+    <>
+      <Header />
+      <Suspense
+        fallback={
+          <div className='min-h-screen pt-16 flex items-center justify-center'>
+            <div className='animate-pulse text-primary'>Loading profile...</div>
+          </div>
+        }
+      >
+        <ProfileContent />
+      </Suspense>
+    </>
   );
 }
