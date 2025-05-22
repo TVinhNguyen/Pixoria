@@ -254,12 +254,20 @@ class ImageViewSet(viewsets.ModelViewSet):
         # Store ID for later reference
         image_id = instance.id
         file_name = instance.file.name if instance.file else "No file"
+
+        user_profile = instance.user
         
         # Get confirmation from perform_destroy before returning response
         self.perform_destroy(instance)
         
         # Log to verify deletion was successful
         print(f"Database record for Image #{image_id} ({file_name}) has been deleted")
+
+        try:
+            user_profile.update_counts()
+            print(f"User {user_profile.user.username} updated counts after deleting image {image_id}")
+        except Exception as e:
+            print(f"Error updating user profile counts: {e}")
         
         # Return no content response
         return Response(status=status.HTTP_204_NO_CONTENT)
