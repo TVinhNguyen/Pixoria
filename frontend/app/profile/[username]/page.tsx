@@ -6,11 +6,12 @@ import Image from "next/image"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Globe, Facebook, Instagram, Calendar, Grid, Bookmark, Heart, Eye, Lock, Loader2, ChevronDown } from "lucide-react"
+import { Globe, Facebook, Instagram, Calendar, Grid, Bookmark, Heart, Eye, Lock, Loader2, ChevronDown, Trash } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import Header from "@/components/header"
 import Footer from "@/components/footer"
 import Masonry from "react-masonry-css"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 
 // Import the original API functions instead of the service functions
 import { handleProfileClick } from "@/lib/api-action/api-profile"
@@ -80,6 +81,10 @@ export default function ProfilePage() {
   const [loadingMorePhotos, setLoadingMorePhotos] = useState(false)
   const [loadingMoreCollections, setLoadingMoreCollections] = useState(false)
   const [totalPhotoCount, setTotalPhotoCount] = useState(0)
+
+  // State for delete photo confirmation dialog
+  const [deletePhotoId, setDeletePhotoId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Function to fetch user photos with pagination
   const fetchUserPhotos = useCallback(async (username: string, page: number = 1): Promise<{photos: UserPhoto[], hasMore: boolean, total: number}> => {
@@ -160,7 +165,7 @@ export default function ProfilePage() {
       const nextPage = photoPage + 1;
       const { photos: newPhotos, hasMore } = await fetchUserPhotos(username, nextPage);
       
-      setPhotos(prev => [...prev, ...newPhotos]);
+      setPhotos((prev: UserPhoto[]) => [...prev, ...newPhotos]);
       setPhotoPage(nextPage);
       setHasMorePhotos(hasMore);
     } catch (error) {
@@ -179,7 +184,7 @@ export default function ProfilePage() {
       const nextPage = collectionPage + 1;
       const { collections: newCollections, hasMore } = await fetchUserCollections(username, nextPage);
       
-      setCollections(prev => [...prev, ...newCollections]);
+      setCollections((prev: Collection[]) => [...prev, ...newCollections]);
       setCollectionPage(nextPage);
       setHasMoreCollections(hasMore);
     } catch (error) {
@@ -252,9 +257,9 @@ export default function ProfilePage() {
         
         // Update total collections count in profile
         if (profile) {
-          setProfile(prev => prev ? {
+          setProfile((prev: UserProfile | null) => prev ? {
             ...prev,
-            totalCollections: collectionsData.length
+            totalPhotos: profileData.photos || 0
           } : null)
         }
         setCollectionsLoading(false)
@@ -331,6 +336,47 @@ export default function ProfilePage() {
       setFollowLoading(false)
     }
   }
+
+  // Hàm mở dialog xác nhận xóa
+  const confirmDeletePhoto = (photoId: string) => {
+    setDeletePhotoId(photoId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Hàm thực hiện xóa khi xác nhận
+  const handleDeletePhoto = async () => {
+    if (!deletePhotoId) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/images/${deletePhotoId}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (res.ok) {
+        const { photos: newPhotos, total } = await fetchUserPhotos(username, 1);
+        setPhotos(newPhotos);
+        setTotalPhotoCount(total);
+        setPhotoPage(1);
+        setHasMorePhotos(newPhotos.length >= PHOTOS_PER_PAGE);
+        const profileData = await handleProfileClick(username);
+        if (profileData) {
+          setProfile((prev: UserProfile | null) => prev ? {
+            ...prev,
+            totalPhotos: profileData.photos || 0
+          } : null);
+        }
+        toast({ title: "Đã xóa ảnh", description: "Ảnh đã được xóa thành công." });
+      } else {
+        toast({ title: "Lỗi", description: "Không thể xóa ảnh.", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Lỗi", description: "Có lỗi xảy ra khi xóa ảnh.", variant: "destructive" });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDeletePhotoId(null);
+    }
+  };
 
   // Handle profile not found or error
   if (!profileLoading && (error || !profile)) {
@@ -491,7 +537,7 @@ export default function ProfilePage() {
                     <div className="text-sm text-gray-600 dark:text-gray-400">Following</div>
                   </div>
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
-                    <div className="text-2xl font-bold">{totalPhotoCount.toLocaleString()}</div>
+                    <div className="text-2xl font-bold">{profile?.totalPhotos.toLocaleString()}</div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">Photos</div>
                   </div>
                   <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm">
@@ -540,7 +586,7 @@ export default function ProfilePage() {
                       className="flex w-auto"
                       columnClassName="bg-clip-padding px-2"
                     >
-                      {photos.map((photo) => (
+                      {photos.map((photo: UserPhoto) => (
                         <div key={photo.id} className="mb-4 group relative overflow-hidden rounded-lg">
                           <Image
                             src={photo.imageUrl || "/placeholder.svg"}
@@ -561,6 +607,13 @@ export default function ProfilePage() {
                                 <Eye className="h-4 w-4" />
                                 {photo.views}
                               </span>
+                              <button
+                                className="ml-auto bg-red-600 hover:bg-red-700 text-white rounded-full p-2 transition"
+                                title="Xóa ảnh"
+                                onClick={() => confirmDeletePhoto(photo.id)}
+                              >
+                                <Trash className="h-4 w-4" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -672,6 +725,18 @@ export default function ProfilePage() {
           collectionId={selectedCollectionId}
         />
       )}
+
+      {/* Popup xác nhận xóa ảnh */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogTitle>Xác nhận xóa ảnh</DialogTitle>
+          <DialogDescription>Bạn có chắc chắn muốn xóa ảnh này không? Hành động này không thể hoàn tác.</DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Hủy</Button>
+            <Button variant="destructive" onClick={handleDeletePhoto}>Xóa</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

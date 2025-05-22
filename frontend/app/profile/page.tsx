@@ -39,6 +39,7 @@ import CollectionImagesModal from '@/components/modal/collections/collection-ima
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 import { useLocalStorage } from '@/hooks/use-localStorage';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 // Define interfaces for this component
 interface UserDetails {
@@ -261,12 +262,22 @@ function ProfileContent() {
     }
   };
 
-  const handleDeleteImage = async (imageId: number) => {
-    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa ảnh này không?');
-    if (!confirmed) return;
+  // State cho dialog xác nhận xóa ảnh
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteImageId, setDeleteImageId] = useState<number | null>(null);
+
+  // Khi bấm nút xóa, mở dialog xác nhận
+  const handleDeleteImage = (imageId: number) => {
+    setDeleteImageId(imageId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  // Hàm thực hiện xóa thật sự khi xác nhận
+  const confirmDeleteImage = async () => {
+    if (!deleteImageId) return;
     try {
       const res = await import('@/lib/api-action/image-actions');
-      const result = await res.handleDeleteImage(imageId);
+      const result = await res.handleDeleteImage(deleteImageId);
       if (result.status === 'success') {
         setToastVariant('success');
         setToastMessage({
@@ -293,6 +304,9 @@ function ProfileContent() {
         duration: 3000
       });
       setToastOpen(true);
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setDeleteImageId(null);
     }
   };
 
@@ -724,6 +738,17 @@ function ProfileContent() {
         onClose={() => setToastOpen(false)}
         duration={toastMessage.duration}
       />
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogTitle>Xác nhận xóa ảnh</DialogTitle>
+          <DialogDescription>Bạn có chắc chắn muốn xóa ảnh này không? Hành động này không thể hoàn tác.</DialogDescription>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Hủy</Button>
+            <Button variant="destructive" onClick={confirmDeleteImage}>Xóa</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
