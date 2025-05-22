@@ -13,7 +13,8 @@ import {
   Edit,
   Share2,
   LinkIcon,
-  Trash
+  Trash,
+  UnfoldHorizontal
 } from 'lucide-react';
 import {
   useQuery,
@@ -31,7 +32,10 @@ import { Collection } from '@/components/modal/collections/edit-collection-modal
 
 // Import getAllFollowers and getAllFollowings
 import { getAllFollowers, getAllFollowings } from '@/lib/api-action/api-follow';
-import { handleGetCollections } from '@/lib/api-action/api-collection';
+import {
+  handleGetCollections,
+  handleDeleteCollection
+} from '@/lib/api-action/api-collection';
 import { handleLike } from '@/lib/api-action/image-actions';
 import ProfileEditModal from '@/components/modal/edit-profile-modal';
 import EditCollectionModal from '@/components/modal/collections/edit-collection-modal';
@@ -39,6 +43,7 @@ import CollectionImagesModal from '@/components/modal/collections/collection-ima
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 import { useLocalStorage } from '@/hooks/use-localStorage';
+import { ConfirmationDialog } from '@/components/modal/confirmation/comfirmation-dialog';
 
 // Define interfaces for this component
 interface UserDetails {
@@ -59,7 +64,8 @@ function ProfileContent() {
     duration: 0
   });
 
-  const router = useRouter();  const tabParams = useSearchParams();
+  const router = useRouter();
+  const tabParams = useSearchParams();
   const defaultTab = tabParams.get('tab') || 'photos';
   const [tab, setTab] = useState(defaultTab);
 
@@ -78,11 +84,18 @@ function ProfileContent() {
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
+  const [collectionToDelete, setCollectionToDelete] = useState<number | null>(
+    null
+  );
+  const [imageToDelete, setImageToDelete] = useState<number | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleteConfirmImageOpen, setIsDeleteConfirmImageOpen] =
+    useState(false);
 
   // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)  const [isUnlikeImage, setUnlikeImage] = useState(false);
 
   const queryClient = useQueryClient();
-    // Sử dụng custom hook cho localStorage để tránh lỗi server-side rendering
+  // Sử dụng custom hook cho localStorage để tránh lỗi server-side rendering
   const [username, , isClient] = useLocalStorage('username', 'guest');
   const [userId] = useLocalStorage('user_id', '');
   // Profile data
@@ -112,12 +125,13 @@ function ProfileContent() {
   const {
     data: collectionsData,
     isLoading: collectionsLoading
-  }: UseQueryResult<{ results: (Collection & { images: number[] })[] }, Error> = useQuery({
-    queryKey: ['collections'],
-    queryFn: handleGetCollections,
-    enabled: tab === 'collections',
-    staleTime: 5 * 60 * 1000
-  });
+  }: UseQueryResult<{ results: (Collection & { images: number[] })[] }, Error> =
+    useQuery({
+      queryKey: ['collections'],
+      queryFn: handleGetCollections,
+      enabled: tab === 'collections',
+      staleTime: 5 * 60 * 1000
+    });
 
   const collections = collectionsData?.results || [];
 
@@ -146,7 +160,8 @@ function ProfileContent() {
   // Fetch collection data manually
   useEffect(() => {
     const fetchCollectionData = async () => {
-      if (isEditCollectionModalOpen && selectedCollectionId) {        try {
+      if (isEditCollectionModalOpen && selectedCollectionId) {
+        try {
           const data = await handleGetCollectionById(
             '',
             selectedCollectionId.toString()
@@ -173,9 +188,7 @@ function ProfileContent() {
   }: UseQueryResult<{ followers: UserDetails[] }, Error> = useQuery({
     queryKey: ['followers', userId],
     queryFn: async () => {
-      const result = await getAllFollowers(
-        Number(userId)
-      );
+      const result = await getAllFollowers(Number(userId));
       if (Array.isArray(result)) {
         return { followers: result };
       }
@@ -193,9 +206,7 @@ function ProfileContent() {
   }: UseQueryResult<{ followings: UserDetails[] }, Error> = useQuery({
     queryKey: ['following', userId],
     queryFn: async () => {
-      const result = await getAllFollowings(
-        Number(userId)
-      );
+      const result = await getAllFollowings(Number(userId));
       if (Array.isArray(result)) {
         return { followings: result };
       }
@@ -254,24 +265,30 @@ function ProfileContent() {
         'Success',
         'Image unliked successfully.',
         3000
-      );    } catch (error: any) {
+      );
+    } catch (error: any) {
       queryClient.invalidateQueries({ queryKey: ['likedImages'] });
       setNotification('error', 'Error', 'Failed to unlike the image.', 3000);
       // Log error silently or use a monitoring tool
     }
   };
 
-  const handleDeleteImage = async (imageId: number) => {
-    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa ảnh này không?');
-    if (!confirmed) return;
+  const handleDeleteImageClick = (imageId: number) => {
+    setImageToDelete(imageId);
+    setIsDeleteConfirmImageOpen(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!imageToDelete) return;
+
     try {
       const res = await import('@/lib/api-action/image-actions');
-      const result = await res.handleDeleteImage(imageId);
+      const result = await res.handleDeleteImage(imageToDelete);
       if (result.status === 'success') {
         setToastVariant('success');
         setToastMessage({
-          title: 'Đã xóa ảnh',
-          description: 'Ảnh đã được xóa thành công.',
+          title: 'Image Deleted',
+          description: 'The image has been deleted successfully.',
           duration: 3000
         });
         setToastOpen(true);
@@ -279,8 +296,8 @@ function ProfileContent() {
       } else {
         setToastVariant('error');
         setToastMessage({
-          title: 'Lỗi',
-          description: result.detail || 'Xóa ảnh thất bại.',
+          title: 'Error',
+          description: result.detail || 'Failed to delete the image.',
           duration: 3000
         });
         setToastOpen(true);
@@ -288,11 +305,50 @@ function ProfileContent() {
     } catch (error) {
       setToastVariant('error');
       setToastMessage({
-        title: 'Lỗi',
-        description: 'Có lỗi xảy ra khi xóa ảnh.',
+        title: 'Error',
+        description: 'An error occurred while deleting the image.',
         duration: 3000
       });
       setToastOpen(true);
+    }
+  };
+
+  const handleDeleteCollectionClick = async (collectionId: number) => {
+    setCollectionToDelete(collectionId);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+
+    try {
+      // khúc chỗ này là cập nhật giao diện
+      queryClient.setQueryData(['collections'], (old: any[] | undefined) => {
+        if (!old || !Array.isArray(old.results)) return old;
+        return {
+          ...old,
+          results: old.results.filter(
+            collection => collection.id !== collectionToDelete
+          )
+        };
+      });
+      await handleDeleteCollection(collectionToDelete.toString());
+      await queryClient.invalidateQueries({ queryKey: ['collections'] });
+      setNotification(
+        'success',
+        'Success',
+        'Collection deleted successfully.',
+        3000
+      );
+    } catch (error: any) {
+      console.log(error);
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      setNotification(
+        'error',
+        'Error',
+        'Failed to delete the collection.',
+        3000
+      );
     }
   };
 
@@ -359,7 +415,6 @@ function ProfileContent() {
           </div>
         </div>
       </div>
-
       <div className='container mx-auto px-4 pt-20 pb-8'>
         <div className='flex flex-col items-center justify-center space-y-2 mb-8'>
           <h1 className='text-3xl font-bold'>
@@ -480,7 +535,7 @@ function ProfileContent() {
                         variant='ghost'
                         size='icon'
                         className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
-                        onClick={() => handleDeleteImage(image.id)}
+                        onClick={() => handleDeleteImageClick(image.id)}
                       >
                         <Trash className='h-4 w-4 fill-current' />
                       </Button>
@@ -536,26 +591,45 @@ function ProfileContent() {
                     <div className='absolute bottom-0 left-0 right-0 p-4'>
                       <h3 className='text-lg font-bold text-white'>
                         {collection.name}
-                      </h3>                      <p className='text-sm text-gray-300'>                        {collection.images && Array.isArray(collection.images) && collection.images.length > 0
+                      </h3>
+                      <p className='text-sm text-gray-300'>
+                        {collection.images &&
+                        Array.isArray(collection.images) &&
+                        collection.images.length > 0
                           ? collection.images.length > 1
                             ? `${collection.images.length} photos`
                             : `${collection.images.length} photo`
-                          : '0 photos'}
+                          : '0 photo'}
                       </p>
                     </div>
-                    <Button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setSelectedCollectionId(collection.id);
-                        setIsEditCollectionModalOpen(true);
-                      }}
-                      variant='ghost'
-                      size='sm'
-                      className='absolute right-2 top-2 bg-black/30 hover:bg-black/50 text-white'
-                    >
-                      <Edit className='h-4 w-4 mr-1' />
-                      Edit
-                    </Button>
+                    <div className='absolute right-1 top-1 flex items-center gap-1 bg-black/40 rounded px-1 py-0.5'>
+                      <Button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSelectedCollectionId(collection.id);
+                          setIsEditCollectionModalOpen(true);
+                        }}
+                        variant='ghost'
+                        size='icon' // đổi size cho nhỏ hơn
+                        className='text-white hover:bg-black/50 h-6 w-6 p-1'
+                      >
+                        <Edit className='h-3 w-3' />
+                      </Button>
+
+                      <UnfoldHorizontal className='text-white h-3 w-3' />
+
+                      <Button
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDeleteCollectionClick(collection.id);
+                        }}
+                        variant='ghost'
+                        size='icon'
+                        className='text-white hover:bg-black/50 h-6 w-6 p-1'
+                      >
+                        <Trash className='h-3 w-3' />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -665,7 +739,6 @@ function ProfileContent() {
           </TabsContent>
         </Tabs>
       </div>
-
       {profileData && (
         <ProfileEditModal
           isOpen={isEditModalOpen}
@@ -681,7 +754,8 @@ function ProfileContent() {
             social_link: profileData.social_link || ''
           }}
         />
-      )}      {isEditCollectionModalOpen &&
+      )}{' '}
+      {isEditCollectionModalOpen &&
         selectedCollectionId != null &&
         collectionData && (
           <EditCollectionModal
@@ -689,7 +763,8 @@ function ProfileContent() {
             onClose={() => setIsEditCollectionModalOpen(false)}
             collectionFetchedData={collectionData as Collection}
           />
-        )}{isCollectionImagesOpen && selectedCollectionId && (
+        )}
+      {isCollectionImagesOpen && selectedCollectionId && (
         <CollectionImagesModal
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
@@ -697,7 +772,6 @@ function ProfileContent() {
           collectionId={String(selectedCollectionId)}
         />
       )}
-
       {isFollowersOpen && (
         <FollowsModal
           isOpen={isFollowersOpen}
@@ -706,7 +780,6 @@ function ProfileContent() {
           users={followersList}
         />
       )}
-
       {isFollowingOpen && (
         <FollowsModal
           isOpen={isFollowingOpen}
@@ -715,7 +788,6 @@ function ProfileContent() {
           users={followingList}
         />
       )}
-
       <ToastNotification
         variant={toastVariant}
         title={toastMessage.title}
@@ -723,6 +795,26 @@ function ProfileContent() {
         isOpen={toastOpen}
         onClose={() => setToastOpen(false)}
         duration={toastMessage.duration}
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={confirmDeleteCollection}
+        title='Delete Collection'
+        description='Are you sure you want to delete this collection? This action cannot be undone.'
+        confirmText='Delete'
+        cancelText='Cancel'
+        variant='destructive'
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteConfirmImageOpen}
+        onClose={() => setIsDeleteConfirmImageOpen(false)}
+        onConfirm={confirmDeleteImage}
+        title='Delete Image'
+        description='Are you sure you want to delete this image? This action cannot be undone.'
+        confirmText='Delete'
+        cancelText='Cancel'
+        variant='destructive'
       />
     </div>
   );
