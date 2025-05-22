@@ -43,6 +43,7 @@ import CollectionImagesModal from '@/components/modal/collections/collection-ima
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 import { useLocalStorage } from '@/hooks/use-localStorage';
+import { ConfirmationDialog } from '@/components/modal/confirmation/comfirmation-dialog';
 
 // Define interfaces for this component
 interface UserDetails {
@@ -83,6 +84,13 @@ function ProfileContent() {
   const [isFollowersOpen, setIsFollowersOpen] = useState(false);
   const [isFollowingOpen, setIsFollowingOpen] = useState(false);
   const [collectionData, setCollectionData] = useState<Collection | null>(null);
+  const [collectionToDelete, setCollectionToDelete] = useState<number | null>(
+    null
+  );
+  const [imageToDelete, setImageToDelete] = useState<number | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [isDeleteConfirmImageOpen, setIsDeleteConfirmImageOpen] =
+    useState(false);
 
   // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)  const [isUnlikeImage, setUnlikeImage] = useState(false);
 
@@ -265,19 +273,22 @@ function ProfileContent() {
     }
   };
 
-  const handleDeleteImage = async (imageId: number) => {
-    const confirmed = window.confirm(
-      'Bạn có chắc chắn muốn xóa ảnh này không?'
-    );
-    if (!confirmed) return;
+  const handleDeleteImageClick = (imageId: number) => {
+    setImageToDelete(imageId);
+    setIsDeleteConfirmImageOpen(true);
+  };
+
+  const confirmDeleteImage = async () => {
+    if (!imageToDelete) return;
+
     try {
       const res = await import('@/lib/api-action/image-actions');
-      const result = await res.handleDeleteImage(imageId);
+      const result = await res.handleDeleteImage(imageToDelete);
       if (result.status === 'success') {
         setToastVariant('success');
         setToastMessage({
-          title: 'Đã xóa ảnh',
-          description: 'Ảnh đã được xóa thành công.',
+          title: 'Image Deleted',
+          description: 'The image has been deleted successfully.',
           duration: 3000
         });
         setToastOpen(true);
@@ -285,8 +296,8 @@ function ProfileContent() {
       } else {
         setToastVariant('error');
         setToastMessage({
-          title: 'Lỗi',
-          description: result.detail || 'Xóa ảnh thất bại.',
+          title: 'Error',
+          description: result.detail || 'Failed to delete the image.',
           duration: 3000
         });
         setToastOpen(true);
@@ -294,8 +305,8 @@ function ProfileContent() {
     } catch (error) {
       setToastVariant('error');
       setToastMessage({
-        title: 'Lỗi',
-        description: 'Có lỗi xảy ra khi xóa ảnh.',
+        title: 'Error',
+        description: 'An error occurred while deleting the image.',
         duration: 3000
       });
       setToastOpen(true);
@@ -303,31 +314,26 @@ function ProfileContent() {
   };
 
   const handleDeleteCollectionClick = async (collectionId: number) => {
+    setCollectionToDelete(collectionId);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return;
+
     try {
-      const confirmed = window.confirm(
-        'Are you sure to delete this collection with the id ' +
-          collectionId +
-          '?'
-      );
-      if (!confirmed) return;
-      // cập nhật giao diện, loại bỏ ảnh collection đã xóa
+      // khúc chỗ này là cập nhật giao diện
       queryClient.setQueryData(['collections'], (old: any[] | undefined) => {
         if (!old || !Array.isArray(old.results)) return old;
         return {
           ...old,
           results: old.results.filter(
-            collection => collection.id !== collectionId
+            collection => collection.id !== collectionToDelete
           )
         };
       });
-
-      // fetch API để lưu ảnh trong db
-      await handleDeleteCollection(collectionId.toString());
-
-      // cập nhật lại cache
+      await handleDeleteCollection(collectionToDelete.toString());
       await queryClient.invalidateQueries({ queryKey: ['collections'] });
-
-      // thông báo là đã thành công
       setNotification(
         'success',
         'Success',
@@ -529,7 +535,7 @@ function ProfileContent() {
                         variant='ghost'
                         size='icon'
                         className='h-8 w-8 rounded-full bg-white/20 text-white backdrop-blur-sm'
-                        onClick={() => handleDeleteImage(image.id)}
+                        onClick={() => handleDeleteImageClick(image.id)}
                       >
                         <Trash className='h-4 w-4 fill-current' />
                       </Button>
@@ -789,6 +795,26 @@ function ProfileContent() {
         isOpen={toastOpen}
         onClose={() => setToastOpen(false)}
         duration={toastMessage.duration}
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={confirmDeleteCollection}
+        title='Delete Collection'
+        description='Are you sure you want to delete this collection? This action cannot be undone.'
+        confirmText='Delete'
+        cancelText='Cancel'
+        variant='destructive'
+      />
+      <ConfirmationDialog
+        isOpen={isDeleteConfirmImageOpen}
+        onClose={() => setIsDeleteConfirmImageOpen(false)}
+        onConfirm={confirmDeleteImage}
+        title='Delete Image'
+        description='Are you sure you want to delete this image? This action cannot be undone.'
+        confirmText='Delete'
+        cancelText='Cancel'
+        variant='destructive'
       />
     </div>
   );
