@@ -596,7 +596,7 @@ function ProfileContent() {
                           : '0 photo'}
                       </p>
                     </div>
-                    <div className='absolute right-2 top-2 flex items-center gap-2 bg-black/30 rounded-md px-2 py-1'>
+                    <div className='absolute right-1 top-1 flex items-center gap-1 bg-black/40 rounded px-1 py-0.5'>
                       <Button
                         onClick={e => {
                           e.stopPropagation();
@@ -604,22 +604,24 @@ function ProfileContent() {
                           setIsEditCollectionModalOpen(true);
                         }}
                         variant='ghost'
-                        size='sm'
-                        className='text-white hover:bg-black/50'
+                        size='icon' // đổi size cho nhỏ hơn
+                        className='text-white hover:bg-black/50 h-6 w-6 p-1'
                       >
-                        <Edit className='h-4 w-4 mr-1' />
+                        <Edit className='h-3 w-3' />
                       </Button>
-                      <UnfoldHorizontal />
+
+                      <UnfoldHorizontal className='text-white h-3 w-3' />
+
                       <Button
                         onClick={e => {
                           e.stopPropagation();
                           handleDeleteCollectionClick(collection.id);
                         }}
                         variant='ghost'
-                        size='sm'
-                        className='text-white hover:bg-black/50'
+                        size='icon'
+                        className='text-white hover:bg-black/50 h-6 w-6 p-1'
                       >
-                        <Trash className='h-4 w-4 mr-1' />
+                        <Trash className='h-3 w-3' />
                       </Button>
                     </div>
                   </div>
