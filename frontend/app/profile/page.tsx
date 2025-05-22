@@ -13,7 +13,8 @@ import {
   Edit,
   Share2,
   LinkIcon,
-  Trash
+  Trash,
+  UnfoldHorizontal
 } from 'lucide-react';
 import {
   useQuery,
@@ -31,7 +32,10 @@ import { Collection } from '@/components/modal/collections/edit-collection-modal
 
 // Import getAllFollowers and getAllFollowings
 import { getAllFollowers, getAllFollowings } from '@/lib/api-action/api-follow';
-import { handleGetCollections } from '@/lib/api-action/api-collection';
+import {
+  handleGetCollections,
+  handleDeleteCollection
+} from '@/lib/api-action/api-collection';
 import { handleLike } from '@/lib/api-action/image-actions';
 import ProfileEditModal from '@/components/modal/edit-profile-modal';
 import EditCollectionModal from '@/components/modal/collections/edit-collection-modal';
@@ -59,7 +63,8 @@ function ProfileContent() {
     duration: 0
   });
 
-  const router = useRouter();  const tabParams = useSearchParams();
+  const router = useRouter();
+  const tabParams = useSearchParams();
   const defaultTab = tabParams.get('tab') || 'photos';
   const [tab, setTab] = useState(defaultTab);
 
@@ -82,7 +87,7 @@ function ProfileContent() {
   // handle cái nút unlike ở tab like (để thêm chức năng unlike cho hắn nhiều)  const [isUnlikeImage, setUnlikeImage] = useState(false);
 
   const queryClient = useQueryClient();
-    // Sử dụng custom hook cho localStorage để tránh lỗi server-side rendering
+  // Sử dụng custom hook cho localStorage để tránh lỗi server-side rendering
   const [username, , isClient] = useLocalStorage('username', 'guest');
   const [userId] = useLocalStorage('user_id', '');
   // Profile data
@@ -112,12 +117,13 @@ function ProfileContent() {
   const {
     data: collectionsData,
     isLoading: collectionsLoading
-  }: UseQueryResult<{ results: (Collection & { images: number[] })[] }, Error> = useQuery({
-    queryKey: ['collections'],
-    queryFn: handleGetCollections,
-    enabled: tab === 'collections',
-    staleTime: 5 * 60 * 1000
-  });
+  }: UseQueryResult<{ results: (Collection & { images: number[] })[] }, Error> =
+    useQuery({
+      queryKey: ['collections'],
+      queryFn: handleGetCollections,
+      enabled: tab === 'collections',
+      staleTime: 5 * 60 * 1000
+    });
 
   const collections = collectionsData?.results || [];
 
@@ -146,7 +152,8 @@ function ProfileContent() {
   // Fetch collection data manually
   useEffect(() => {
     const fetchCollectionData = async () => {
-      if (isEditCollectionModalOpen && selectedCollectionId) {        try {
+      if (isEditCollectionModalOpen && selectedCollectionId) {
+        try {
           const data = await handleGetCollectionById(
             '',
             selectedCollectionId.toString()
@@ -173,9 +180,7 @@ function ProfileContent() {
   }: UseQueryResult<{ followers: UserDetails[] }, Error> = useQuery({
     queryKey: ['followers', userId],
     queryFn: async () => {
-      const result = await getAllFollowers(
-        Number(userId)
-      );
+      const result = await getAllFollowers(Number(userId));
       if (Array.isArray(result)) {
         return { followers: result };
       }
@@ -193,9 +198,7 @@ function ProfileContent() {
   }: UseQueryResult<{ followings: UserDetails[] }, Error> = useQuery({
     queryKey: ['following', userId],
     queryFn: async () => {
-      const result = await getAllFollowings(
-        Number(userId)
-      );
+      const result = await getAllFollowings(Number(userId));
       if (Array.isArray(result)) {
         return { followings: result };
       }
@@ -254,7 +257,8 @@ function ProfileContent() {
         'Success',
         'Image unliked successfully.',
         3000
-      );    } catch (error: any) {
+      );
+    } catch (error: any) {
       queryClient.invalidateQueries({ queryKey: ['likedImages'] });
       setNotification('error', 'Error', 'Failed to unlike the image.', 3000);
       // Log error silently or use a monitoring tool
@@ -262,7 +266,9 @@ function ProfileContent() {
   };
 
   const handleDeleteImage = async (imageId: number) => {
-    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa ảnh này không?');
+    const confirmed = window.confirm(
+      'Bạn có chắc chắn muốn xóa ảnh này không?'
+    );
     if (!confirmed) return;
     try {
       const res = await import('@/lib/api-action/image-actions');
@@ -293,6 +299,50 @@ function ProfileContent() {
         duration: 3000
       });
       setToastOpen(true);
+    }
+  };
+
+  const handleDeleteCollectionClick = async (collectionId: number) => {
+    try {
+      const confirmed = window.confirm(
+        'Are you sure to delete this collection with the id ' +
+          collectionId +
+          '?'
+      );
+      if (!confirmed) return;
+      // cập nhật giao diện, loại bỏ ảnh collection đã xóa
+      queryClient.setQueryData(['collections'], (old: any[] | undefined) => {
+        if (!old || !Array.isArray(old.results)) return old;
+        return {
+          ...old,
+          results: old.results.filter(
+            collection => collection.id !== collectionId
+          )
+        };
+      });
+
+      // fetch API để lưu ảnh trong db
+      await handleDeleteCollection(collectionId.toString());
+
+      // cập nhật lại cache
+      await queryClient.invalidateQueries({ queryKey: ['collections'] });
+
+      // thông báo là đã thành công
+      setNotification(
+        'success',
+        'Success',
+        'Collection deleted successfully.',
+        3000
+      );
+    } catch (error: any) {
+      console.log(error);
+      queryClient.invalidateQueries({ queryKey: ['collections'] });
+      setNotification(
+        'error',
+        'Error',
+        'Failed to delete the collection.',
+        3000
+      );
     }
   };
 
@@ -359,7 +409,6 @@ function ProfileContent() {
           </div>
         </div>
       </div>
-
       <div className='container mx-auto px-4 pt-20 pb-8'>
         <div className='flex flex-col items-center justify-center space-y-2 mb-8'>
           <h1 className='text-3xl font-bold'>
@@ -536,26 +585,43 @@ function ProfileContent() {
                     <div className='absolute bottom-0 left-0 right-0 p-4'>
                       <h3 className='text-lg font-bold text-white'>
                         {collection.name}
-                      </h3>                      <p className='text-sm text-gray-300'>                        {collection.images && Array.isArray(collection.images) && collection.images.length > 0
+                      </h3>
+                      <p className='text-sm text-gray-300'>
+                        {collection.images &&
+                        Array.isArray(collection.images) &&
+                        collection.images.length > 0
                           ? collection.images.length > 1
                             ? `${collection.images.length} photos`
                             : `${collection.images.length} photo`
-                          : '0 photos'}
+                          : '0 photo'}
                       </p>
                     </div>
-                    <Button
-                      onClick={e => {
-                        e.stopPropagation();
-                        setSelectedCollectionId(collection.id);
-                        setIsEditCollectionModalOpen(true);
-                      }}
-                      variant='ghost'
-                      size='sm'
-                      className='absolute right-2 top-2 bg-black/30 hover:bg-black/50 text-white'
-                    >
-                      <Edit className='h-4 w-4 mr-1' />
-                      Edit
-                    </Button>
+                    <div className='absolute right-2 top-2 flex items-center gap-2 bg-black/30 rounded-md px-2 py-1'>
+                      <Button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSelectedCollectionId(collection.id);
+                          setIsEditCollectionModalOpen(true);
+                        }}
+                        variant='ghost'
+                        size='sm'
+                        className='text-white hover:bg-black/50'
+                      >
+                        <Edit className='h-4 w-4 mr-1' />
+                      </Button>
+                      <UnfoldHorizontal />
+                      <Button
+                        onClick={e => {
+                          e.stopPropagation();
+                          handleDeleteCollectionClick(collection.id);
+                        }}
+                        variant='ghost'
+                        size='sm'
+                        className='text-white hover:bg-black/50'
+                      >
+                        <Trash className='h-4 w-4 mr-1' />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -665,7 +731,6 @@ function ProfileContent() {
           </TabsContent>
         </Tabs>
       </div>
-
       {profileData && (
         <ProfileEditModal
           isOpen={isEditModalOpen}
@@ -681,7 +746,8 @@ function ProfileContent() {
             social_link: profileData.social_link || ''
           }}
         />
-      )}      {isEditCollectionModalOpen &&
+      )}{' '}
+      {isEditCollectionModalOpen &&
         selectedCollectionId != null &&
         collectionData && (
           <EditCollectionModal
@@ -689,7 +755,8 @@ function ProfileContent() {
             onClose={() => setIsEditCollectionModalOpen(false)}
             collectionFetchedData={collectionData as Collection}
           />
-        )}{isCollectionImagesOpen && selectedCollectionId && (
+        )}
+      {isCollectionImagesOpen && selectedCollectionId && (
         <CollectionImagesModal
           isOpen={isCollectionImagesOpen}
           onClose={() => setIsCollectionImagesOpen(false)}
@@ -697,7 +764,6 @@ function ProfileContent() {
           collectionId={String(selectedCollectionId)}
         />
       )}
-
       {isFollowersOpen && (
         <FollowsModal
           isOpen={isFollowersOpen}
@@ -706,7 +772,6 @@ function ProfileContent() {
           users={followersList}
         />
       )}
-
       {isFollowingOpen && (
         <FollowsModal
           isOpen={isFollowingOpen}
@@ -715,7 +780,6 @@ function ProfileContent() {
           users={followingList}
         />
       )}
-
       <ToastNotification
         variant={toastVariant}
         title={toastMessage.title}
