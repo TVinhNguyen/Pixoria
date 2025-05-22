@@ -318,37 +318,6 @@ function ProfileContent() {
       setImageToDelete(null);
     }
   };
-      if (result.status === 'success') {
-        setToastVariant('success');
-        setToastMessage({
-          title: 'Image Deleted',
-          description: 'The image has been deleted successfully.',
-          duration: 3000
-        });
-        setToastOpen(true);
-        await queryClient.invalidateQueries();
-      } else {
-        setToastVariant('error');
-        setToastMessage({
-          title: 'Error',
-          description: result.detail || 'Failed to delete the image.',
-          duration: 3000
-        });
-        setToastOpen(true);
-      }
-    } catch (error) {
-      setToastVariant('error');
-      setToastMessage({
-        title: 'Error',
-        description: 'An error occurred while deleting the image.',
-        duration: 3000
-      });
-      setToastOpen(true);
-    } finally {
-      setIsDeleteDialogOpen(false);
-      setDeleteImageId(null);
-    }
-  };
 
   const handleDeleteCollectionClick = async (collectionId: number) => {
     setCollectionToDelete(collectionId);
@@ -359,16 +328,19 @@ function ProfileContent() {
     if (!collectionToDelete) return;
 
     try {
-      // khúc chỗ này là cập nhật giao diện
-      queryClient.setQueryData(['collections'], (old: any[] | undefined) => {
-        if (!old || !Array.isArray(old.results)) return old;
-        return {
-          ...old,
-          results: old.results.filter(
-            collection => collection.id !== collectionToDelete
-          )
-        };
-      });
+      // cập nhật giao diện
+      queryClient.setQueryData(
+        ['collections'],
+        (old: { results: (Collection & { images: number[] })[] } | undefined) => {
+          if (!old || !Array.isArray(old.results)) return old;
+          return {
+            ...old,
+            results: old.results.filter(
+              (collection: Collection & { images: number[] }) => collection.id !== collectionToDelete
+            )
+          };
+        }
+      );
       await handleDeleteCollection(collectionToDelete.toString());
       await queryClient.invalidateQueries({ queryKey: ['collections'] });
       setNotification(
@@ -833,19 +805,6 @@ function ProfileContent() {
         onClose={() => setToastOpen(false)}
         duration={toastMessage.duration}
       />
-<<<<<<< HEAD
-
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="max-w-sm mx-auto">
-          <DialogTitle>Xác nhận xóa ảnh</DialogTitle>
-          <DialogDescription>Bạn có chắc chắn muốn xóa ảnh này không? Hành động này không thể hoàn tác.</DialogDescription>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Hủy</Button>
-            <Button variant="destructive" onClick={confirmDeleteImage}>Xóa</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-=======
       <ConfirmationDialog
         isOpen={isDeleteConfirmOpen}
         onClose={() => setIsDeleteConfirmOpen(false)}
@@ -866,7 +825,6 @@ function ProfileContent() {
         cancelText='Cancel'
         variant='destructive'
       />
->>>>>>> 38e6cce78d2d607e4d244d7657563cd9c67b157d
     </div>
   );
 }
