@@ -261,20 +261,21 @@ def update_clip_index(sender, instance, created, **kwargs):
 
 @receiver(post_delete, sender=Image)
 def remove_image_from_index(sender, instance, **kwargs):
-    """Remove image from CLIP index when it is deleted"""
+    """Remove image from CLIP index when it is deleted and update user's photo count"""
+    # Cập nhật số lượng ảnh cho user
+    if instance.user:
+        instance.user.update_counts()
     if instance.is_public:  # Only process if the image is public
         # Remove from CLIP index
         try:
             # Kiểm tra xem ảnh có tồn tại trong CLIP index hay không
             clip_search = get_clip_search()
-            
             # Kiểm tra sự tồn tại của ảnh trong metadata của index
             image_exists = False
             for img_id in clip_search.image_ids:
                 if str(img_id) == str(instance.id):
                     image_exists = True
                     break
-            
             if image_exists:
                 clip_search.remove_from_index(instance.id)
                 print(f"✅ Successfully removed image #{instance.id} from the CLIP index")
