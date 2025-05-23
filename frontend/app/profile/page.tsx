@@ -555,7 +555,7 @@ function ProfileContent() {
             ) : (
               <div className='text-center py-10'>
                 <p className='text-muted-foreground'>No photos uploaded yet</p>
-                <Button className='mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'>
+                <Button className='mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' onClick={() => router.push('/upload')}>
                   Upload Your First Photo
                 </Button>
               </div>
