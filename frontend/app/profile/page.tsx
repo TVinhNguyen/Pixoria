@@ -43,6 +43,8 @@ import CollectionImagesModal from '@/components/modal/collections/collection-ima
 import FollowsModal from '@/components/modal/follow/follow-modal';
 import ToastNotification from '@/components/modal/message-modal';
 import { useLocalStorage } from '@/hooks/use-localStorage';
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import Header from '@/components/header';
 import { ConfirmationDialog } from '@/components/modal/confirmation/comfirmation-dialog';
 
 // Define interfaces for this component
@@ -273,14 +275,15 @@ function ProfileContent() {
     }
   };
 
+  // Khi bấm nút xóa, mở dialog xác nhận
   const handleDeleteImageClick = (imageId: number) => {
     setImageToDelete(imageId);
     setIsDeleteConfirmImageOpen(true);
   };
 
+  // Hàm thực hiện xóa thật sự khi xác nhận
   const confirmDeleteImage = async () => {
     if (!imageToDelete) return;
-
     try {
       const res = await import('@/lib/api-action/image-actions');
       const result = await res.handleDeleteImage(imageToDelete);
@@ -310,6 +313,9 @@ function ProfileContent() {
         duration: 3000
       });
       setToastOpen(true);
+    } finally {
+      setIsDeleteConfirmImageOpen(false);
+      setImageToDelete(null);
     }
   };
 
@@ -322,16 +328,19 @@ function ProfileContent() {
     if (!collectionToDelete) return;
 
     try {
-      // khúc chỗ này là cập nhật giao diện
-      queryClient.setQueryData(['collections'], (old: any[] | undefined) => {
-        if (!old || !Array.isArray(old.results)) return old;
-        return {
-          ...old,
-          results: old.results.filter(
-            collection => collection.id !== collectionToDelete
-          )
-        };
-      });
+      // cập nhật giao diện
+      queryClient.setQueryData(
+        ['collections'],
+        (old: { results: (Collection & { images: number[] })[] } | undefined) => {
+          if (!old || !Array.isArray(old.results)) return old;
+          return {
+            ...old,
+            results: old.results.filter(
+              (collection: Collection & { images: number[] }) => collection.id !== collectionToDelete
+            )
+          };
+        }
+      );
       await handleDeleteCollection(collectionToDelete.toString());
       await queryClient.invalidateQueries({ queryKey: ['collections'] });
       setNotification(
@@ -546,7 +555,7 @@ function ProfileContent() {
             ) : (
               <div className='text-center py-10'>
                 <p className='text-muted-foreground'>No photos uploaded yet</p>
-                <Button className='mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'>
+                <Button className='mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700' onClick={() => router.push('/upload')}>
                   Upload Your First Photo
                 </Button>
               </div>
@@ -822,14 +831,17 @@ function ProfileContent() {
 
 export default function Profile() {
   return (
-    <Suspense
-      fallback={
-        <div className='min-h-screen pt-16 flex items-center justify-center'>
-          <div className='animate-pulse text-primary'>Loading profile...</div>
-        </div>
-      }
-    >
-      <ProfileContent />
-    </Suspense>
+    <>
+      <Header />
+      <Suspense
+        fallback={
+          <div className='min-h-screen pt-16 flex items-center justify-center'>
+            <div className='animate-pulse text-primary'>Loading profile...</div>
+          </div>
+        }
+      >
+        <ProfileContent />
+      </Suspense>
+    </>
   );
 }
